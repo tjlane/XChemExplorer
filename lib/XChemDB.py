@@ -7,11 +7,13 @@ from datetime import datetime
 import getpass
 
 sys.path.append(os.getenv('XChemExplorer_DIR')+'/lib')
-#from XChemUtils import parse
 import XChemLog
 
 
 class data_source:
+    """
+    Hacked apart by TJL to try and get it to work with our SQL DB on <cfeld-vm04.desy.de>
+    """
 
     def __init__(self,data_source_file):
 
@@ -509,7 +511,7 @@ class data_source:
         connect.row_factory = sqlite3.Row
         cursor = connect.cursor()
 
-        tableDict = {   'mainTable':        self.column_list,
+        tableDict = {   #'mainTable':        self.column_list,
                         'panddaTable':      self.pandda_table_columns,
                         'depositTable':     self.deposition_table_columns,
                         'collectionTable':  self.data_collection_columns,
@@ -533,44 +535,11 @@ class data_source:
                     for idx in range(5):
                         cursor.execute("insert into labelTable (ID) Values (%s)" %str(idx+1))
 
-#        existing_columns=[]
-#        connect=sqlite3.connect(self.data_source_file)
-#        connect.row_factory = sqlite3.Row
-#        cursor = connect.cursor()
-#        cursor.execute("SELECT * FROM mainTable")
-#        for column in cursor.description:
-#            existing_columns.append(column[0])
-#        for column in self.column_list:
-#            if column[0] not in existing_columns:
-#                cursor.execute("alter table mainTable add column '"+column[0]+"' '"+column[2]+"'")
-#                connect.commit()
-#        # create PANDDA table if not exists
-#        cursor.execute("create table if not exists panddaTable (ID INTEGER);")
-#        existing_columns=[]
-#        cursor.execute("SELECT * FROM panddaTable")
-#        for column in cursor.description:
-#            existing_columns.append(column[0])
-#        for column in self.pandda_table_columns:
-#            if column[0] not in existing_columns:
-#                cursor.execute("alter table panddaTable add column '"+column[0]+"' '"+column[2]+"'")
-#                connect.commit()
-#        # create DEPOSIT table if not exists
-#        cursor.execute("create table if not exists depositTable (ID INTEGER);")
-#        existing_columns=[]
-#        cursor.execute("SELECT * FROM depositTable")
-#        for column in cursor.description:
-#            existing_columns.append(column[0])
-#        for column in self.deposition_table_columns:
-#            if column[0] not in existing_columns:
-#                cursor.execute("alter table depositTable add column '"+column[0]+"' '"+column[2]+"'")
-#                connect.commit()
-
-
-    def return_column_list(self):
-        return self.column_list
-
 
     def create_empty_data_source_file(self):
+
+        # TJL : this is creating the data table, which we should not need....
+        raise RuntimeError('disabled by TJL, should not be needed')
 
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         with connect:
@@ -579,16 +548,12 @@ class data_source:
             for i in range(1,len(self.column_list)):
                 cursor.execute("alter table mainTable add column '"+self.column_list[i][0]+"' '"+self.column_list[i][2]+"'")
             connect.commit()
-        # Don't need to create panddaTable at this point, because table will be created by create_missing_columns
-        # which is called the first time a data source in specified in XCE
-#        with connect:
-#            cursor = connect.cursor()
-#            cursor.execute("CREATE TABLE panddaTable("+self.pandda_table_columns[0][0]+' '+self.pandda_table_columns[0][2]+")")
-#            for i in range(1,len(self.pandda_table_columns)):
-#                cursor.execute("alter table mainTable add column '"+self.pandda_table_columns[i][0]+"' '"+self.pandda_table_columns[i][2]+"'")
-#            connect.commit()
 
     def get_all_samples_in_data_source_as_list(self):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
         cursor.execute("SELECT CrystalName FROM mainTable")
@@ -599,14 +564,13 @@ class data_source:
         return existing_samples_in_db
 
     def execute_statement(self,cmd):
-        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
-        cursor = connect.cursor()
-        cursor.execute(cmd)
-        output=cursor.fetchall()
-        connect.commit()
-        return output
+        raise RuntimeError('disabled by TJL, seems unsafe... (cmd=%d)' % cmd)
 
     def get_db_dict_for_sample(self,sampleID):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         db_dict={}
         header=[]
         data=[]
@@ -699,85 +663,10 @@ class data_source:
         return sample_exists
 
     def import_csv_file(self,csv_file):
-        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
-        cursor = connect.cursor()
-        available_columns=[]
-        cursor.execute("SELECT * FROM mainTable")
-        for column in cursor.description:           # only update existing columns in data source
-            available_columns.append(column[0])
-        with open(csv_file,'rb') as csv_import: # `with` statement available in 2.5+
-            # csv.DictReader uses first line in file for column headings by default
-            csv_dict = csv.DictReader(csv_import) # comma is default delimiter
-            for line in csv_dict:
-                sampleID=line['CrystalName']
-                if str(sampleID).replace(' ','')=='':
-                    continue
-                if self.check_if_sample_exists_in_data_source(sampleID):
-                    update_string=''
-                    for key,value in line.iteritems():
-                        if key=='ID' or key=='CrystalName':
-                            continue
-                        if key not in available_columns:
-                            continue
-                        # this is how I had it originally, so it would ignore empty fields
-                        # the problem is that if the user wants to set all values to Null,
-                        # if will ignore it and leave the inital value in the datasource
-#                        if not str(value).replace(' ','')=='':  # ignore if nothing in csv field
-#                            update_string+=str(key)+'='+"'"+str(value)+"'"+','
-#                            print "UPDATE mainTable SET "+update_string[:-1]+" WHERE CrystalName="+"'"+sampleID+"';"
-#                            cursor.execute("UPDATE mainTable SET "+update_string[:-1]+" WHERE CrystalName="+"'"+sampleID+"';")
-                        # now try this instead; not sure what will break now...
-                        update_string+=str(key)+'='+"'"+str(value)+"'"+','
-#                        print "UPDATE mainTable SET "+update_string[:-1]+" WHERE CrystalName="+"'"+sampleID+"';"
-                        cursor.execute("UPDATE mainTable SET "+update_string[:-1]+" WHERE CrystalName="+"'"+sampleID+"';")
-                else:
-                    column_string=''
-                    value_string=''
-                    for key,value in line.iteritems():
-                        if key=='ID':
-                            continue
-                        if key not in available_columns:
-                            continue
-                        if not str(value).replace(' ','')=='':  # ignore if nothing in csv field
-                            value_string+="'"+value+"'"+','
-                            column_string+=key+','
-#                    print sampleID
-#                    print          "INSERT INTO mainTable ("+column_string[:-1]+") VALUES ("+value_string[:-1]+");"
-                    cursor.execute("INSERT INTO mainTable ("+column_string[:-1]+") VALUES ("+value_string[:-1]+");")
-
-        connect.commit()
+        raise RuntimeError('disabled by TJL')
 
     def update_data_source(self,sampleID,data_dict):
-        print 'here'
-        data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
-        data_dict['LastUpdated_by']=getpass.getuser()
-
-        # need to do this since some older sqlite files contain a columnn called
-        # DataProcessingResolutionHigh1.5sigma
-        # and this does not go down well with the SQLite statement below
-        removeKey=''
-        for key in data_dict:
-            if '.5' in key:
-                removeKey=key
-                break
-        if removeKey != '':
-            del data_dict[removeKey]
-
-        connect=sqlite3.connect(self.data_source_file)
-        cursor = connect.cursor()
-        update_string=''
-        for key in data_dict:
-            value=data_dict[key]
-            if key=='ID' or key=='CrystalName':
-                continue
-            if not str(value).replace(' ','')=='':  # ignore empty fields
-                update_string+=str(key)+'='+"'"+str(value)+"'"+','
-            else:
-                update_string+=str(key)+' = null,'
-        if update_string != '':
-#            print "UPDATE mainTable SET "+update_string[:-1]+" WHERE CrystalName="+"'"+sampleID+"'"
-            cursor.execute("UPDATE mainTable SET "+update_string[:-1]+" WHERE CrystalName="+"'"+sampleID+"'")
-            connect.commit()
+        raise RuntimeError('disabled by TJL, not safe')
 
     def update_panddaTable(self,sampleID,site_index,data_dict):
         data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -839,6 +728,12 @@ class data_source:
 
 
     def update_specified_table(self,sampleID,data_dict,table):
+
+        # >>> TJL
+        if table == 'mainTable':
+            raise RuntimeError('disabled by TJL')
+        # <<<
+
         data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
         data_dict['LastUpdated_by']=getpass.getuser()
         connect=sqlite3.connect(self.data_source_file)
@@ -855,39 +750,7 @@ class data_source:
             connect.commit()
 
     def update_insert_data_source(self,sampleID,data_dict):
-        data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
-        data_dict['LastUpdated_by']=getpass.getuser()
-        connect=sqlite3.connect(self.data_source_file)
-        cursor = connect.cursor()
-        cursor.execute('Select CrystalName FROM mainTable')
-        available_columns=[]
-        cursor.execute("SELECT * FROM mainTable")
-        for column in cursor.description:           # only update existing columns in data source
-            available_columns.append(column[0])
-        if self.check_if_sample_exists_in_data_source(sampleID):
-            for key in data_dict:
-                value=data_dict[key]
-                if key=='ID' or key=='CrystalName':
-                    continue
-                if not str(value).replace(' ','')=='':  # ignore empty fields
-                    update_string=str(key)+'='+"'"+str(value)+"'"
-                    cursor.execute("UPDATE mainTable SET "+update_string+" WHERE CrystalName="+"'"+sampleID+"';")
-        else:
-            column_string='CrystalName'+','
-            value_string="'"+sampleID+"'"+','
-            for key in data_dict:
-                value=data_dict[key]
-                if key=='ID':
-                    continue
-                if key not in available_columns:
-                    continue
-                if not str(value).replace(' ','')=='':  # ignore if nothing in csv field
-                    value_string+="'"+str(value)+"'"+','
-                    column_string+=key+','
-            cursor.execute("INSERT INTO mainTable ("+column_string[:-1]+") VALUES ("+value_string[:-1]+");")
-        connect.commit()
-
-
+        raise RuntimeError('disabled by TJL')
 
     def update_insert_panddaTable(self,sampleID,data_dict):
         data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -895,10 +758,6 @@ class data_source:
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
         cursor.execute('Select CrystalName,PANDDA_site_index FROM panddaTable')
-#        available_columns=[]
-#        cursor.execute("SELECT * FROM panddaTable")
-#        for column in cursor.description:           # only update existing columns in data source
-#            available_columns.append(column[0])
         samples_sites_in_table=[]
         tmp=cursor.fetchall()
         for item in tmp:
@@ -917,7 +776,6 @@ class data_source:
                     continue
                 if not str(value).replace(' ','')=='':  # ignore empty fields
                     update_string=str(key)+'='+"'"+str(value)+"'"
-#                    print "UPDATE panddaTable SET "+update_string+" WHERE CrystalName="+"'"+sampleID+"' and PANDDA_site_index is '"+data_dict['PANDDA_site_index']+"';"
                     cursor.execute("UPDATE panddaTable SET "+update_string+" WHERE CrystalName="+"'"+sampleID+"' and PANDDA_site_index is '"+data_dict['PANDDA_site_index']+"';")
         else:
             column_string=''
@@ -936,6 +794,12 @@ class data_source:
         connect.commit()
 
     def update_insert_any_table(self,table,data_dict,condition_dict):
+
+        # >>> TJL
+        if table == 'mainTable':
+            raise RuntimeError('disabled by TJL')
+        # <<<
+
         data_dict['LastUpdated'] = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
         data_dict['LastUpdated_by'] = getpass.getuser()
         connect = sqlite3.connect(self.data_source_file)
@@ -1078,6 +942,9 @@ class data_source:
 
 
     def update_insert_not_null_fields_only(self,sampleID,data_dict):
+
+        raise RuntimeError('disabled by TJL')
+
         data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
         data_dict['LastUpdated_by']=getpass.getuser()
         connect=sqlite3.connect(self.data_source_file)
@@ -1113,12 +980,17 @@ class data_source:
         connect.commit()
 
     def get_value_from_field(self,sampleID,column):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
         cursor.execute("SELECT "+column+" FROM  mainTable WHERE CrystalName='"+sampleID+"';")
         return cursor.fetchone()
 
     def export_to_csv_file(self,csv_file):
+        raise RuntimeError('disabled by TJL, dont think we need it')
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
         cursor.execute("SELECT * FROM mainTable")
@@ -1129,19 +1001,11 @@ class data_source:
         csvWriter = csv.writer(open(csv_file, "w"))
         csvWriter.writerows([header]+rows)
 
-
-#    def load_samples_from_data_source(self):
-#        header=[]
-#        data=[]
-#        connect=sqlite3.connect(self.data_source_file)
-#        cursor = connect.cursor()
-#        cursor.execute("SELECT * FROM mainTable")
-#        for column in cursor.description:
-#            header.append(column[0])
-#        data = cursor.fetchall()
-#        return ([header,data])
-
     def load_samples_from_data_source(self):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         header=[]
         data=[]
         connect=sqlite3.connect(self.data_source_file)
@@ -1151,72 +1015,6 @@ class data_source:
             header.append(column[0])
         data = cursor.fetchall()
         return header,data
-
-
-
-
-
-#    def get_samples_for_coot(self,RefinementOutcome,pandda_site):
-#        sample_list_for_coot=[]
-#        connect=sqlite3.connect(self.data_source_file)
-#        cursor = connect.cursor()
-#
-#        if RefinementOutcome=='0 - All Datasets':
-#            outcome = " not null "
-#        else:
-#            outcome = " '%s' " %RefinementOutcome
-#
-#        if int(pandda_site) > 0:
-#            sqlite = (
-#                "select"
-#                " mainTable.CrystalName,"
-#                " mainTable.CompoundCode,"
-#                " mainTable.RefinementCIF,"
-#                " mainTable.RefinementMTZfree,"
-#                " mainTable.RefinementPathToRefinementFolder,"
-#                " panddaTable.RefinementOutcome, "
-#                " panddaTable.PANDDA_site_event_map,"
-#                " panddaTable.PANDDA_site_confidence,"
-#                " panddaTable.PANDDA_site_x,"
-#                " panddaTable.PANDDA_site_y,"
-#                " panddaTable.PANDDA_site_z,"
-#                " panddaTable.PANDDA_site_initial_model,"
-#                " panddaTable.PANDDA_site_initial_mtz,"
-#                " panddaTable.PANDDA_site_spider_plot, "
-#                " panddaTable.PANDDA_site_index "
-#                "from mainTable inner join panddaTable on mainTable.CrystalName = panddaTable.CrystalName "
-#                "where panddaTable.PANDDA_site_index is '%s'" %pandda_site+
-#                " and panddaTable.PANDDA_site_ligand_placed is 'True'"
-#                " and panddaTable.RefinementOutcome is %s;" %outcome
-#                )
-#
-#        else:
-#            sqlite = (
-#                "select"
-#                " CrystalName,"
-#                " CompoundCode,"
-#                " RefinementCIF,"
-#                " RefinementMTZfree,"
-#                " RefinementPathToRefinementFolder,"
-#                " RefinementOutcome "
-#                "from mainTable "
-#                "where RefinementOutcome is %s;" %outcome
-#                )
-#
-#        cursor.execute(sqlite)
-#
-#        tmp = cursor.fetchall()
-#        for item in tmp:
-#            tmpx=[]
-#            for i in list(item):
-#                if i==None:
-#                    tmpx.append('None')
-#                else:
-#                    tmpx.append(i)
-#            line=[x.encode('UTF8') for x in tmpx]
-#            sample_list_for_coot.append(line)
-#
-#        return sample_list_for_coot
 
     def get_pandda_info_for_coot(self,xtalID,pandda_site):
         pandda_info_for_coot=[]
@@ -1254,6 +1052,10 @@ class data_source:
 
 
     def get_todo_list_for_coot(self,RefinementOutcome,pandda_site):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         sample_list_for_coot=[]
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
@@ -1335,6 +1137,10 @@ class data_source:
 
 
     def get_todoList_for_coot(self,RefinementOutcome):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         sample_list_for_coot=[]
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
@@ -1398,9 +1204,6 @@ class data_source:
                         crystalDict[entry[0]].append( [ str(item[0]),str(item[1]),str(item[2]),str(item[3]),str(item[4]),str(item[5]),str(item[6]),str(item[7]),str(item[8]),str(item[9]),str(item[10]),str(item[11]) ])
 
         return sample_list_for_coot,crystalDict
-
-
-
 
     def translate_xce_column_list_to_sqlite(self,column_list):
         out_list=[]
@@ -1655,36 +1458,8 @@ class data_source:
         cursor.execute(sqlite)
         connect.commit()
 
-
-
-
-#        for item in tmp:
-#            print item
-#            for xtal in str(item[0]).split(';'):
-#                if xtal not in apoStructureList: apoStructureList.append(xtal)
-#        if apoStructureList==[]:
-#            Logfile.insert('no apo structures were assigned to your pandda models')
-#        else:
-#            Logfile.insert('the following datasets were at some point used as apo structures for pandda.analyse: '+str(apoStructureList))
-#            apoInDB=[]
-#            cursor.execute("select CrystalName from depositTable where StructureType is 'apo'")
-#            tmp = cursor.fetchall()
-#            for xtal in tmp:
-#                Logfile.insert(str(xtal[0])+' exists as entry for apo structure in database')
-#                apoInDB.append(str(xtal[0]))
-#            newEntries=''
-#            for xtal in apoStructureList:
-#                if xtal not in apoInDB:
-#                    Logfile.insert('no entry for '+xtal+' in depositTable')
-#                    newEntries+="('%s','apo')," %xtal
-#            if newEntries != '':
-#                sqlite='insert into depositTable (CrystalName,StructureType) values %s;' %newEntries[:-1]
-#                Logfile.insert('creating new entries with the following SQLite command:\n'+sqlite)
-#                cursor.execute(sqlite)
-#                connect.commit()
-#
-
     def collected_xtals_during_visit(self,visitID):
+        raise RuntimeError('disabled by TJL, doesnt make sense in our context')
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
         cursor.execute("select CrystalName from collectionTable where DataCollectionVisit = '{0!s}'".format(visitID))
@@ -1696,6 +1471,7 @@ class data_source:
         return collectedXtals
 
     def collected_xtals_during_visit_for_scoring(self,visit):
+        raise RuntimeError('disabled by TJL, doesnt make sense in our context')
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
         xtalList = []
@@ -1711,6 +1487,9 @@ class data_source:
         return xtalList
 
     def autoprocessing_result_user_assigned(self,sample):
+
+        raise NotImplementedError('do we need this?')
+
         userassigned = False
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
@@ -1728,6 +1507,9 @@ class data_source:
 
 
     def all_results_of_xtals_collected_during_visit_as_dict(self,visitID):
+
+        raise RuntimeError('we dont need this')
+
         # first get all collected xtals as list
         collectedXtals = self.collected_xtals_during_visit(visitID)
         xtalDict = {}
@@ -1797,6 +1579,9 @@ class data_source:
         return dbList
 
     def get_db_dict_for_visit_run_autoproc(self,xtal,visit,run,autoproc):
+
+        raise RuntimeError('dont need this')
+
         db_dict = {}
         header=[]
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
@@ -1816,6 +1601,9 @@ class data_source:
         return db_dict
 
     def xtals_collected_during_visit_as_dict(self,visitID):
+
+        raise RuntimeError('dont need this')
+
         # first get all collected xtals as list
         if isinstance(visitID,list):    # for Agamemnon data structure
             collectedXtals = []
@@ -1833,9 +1621,11 @@ class data_source:
             xtalDict[xtal] = db_dict
         return xtalDict
 
-
-
     def getCrystalImageDict(self,visit,xtalList):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
         imageDict = {}
@@ -1855,6 +1645,10 @@ class data_source:
         return imageDict
 
     def samples_for_html_summary(self):
+
+        # TJL we will need to implement this
+        raise NotImplementedError()
+
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
         cursor.execute("select CrystalName from mainTable where RefinementOutcome like '4%' or "
@@ -1938,6 +1732,10 @@ class data_source:
         return labelList
 
     def get_label_of_sample(self,xtalID):
+
+        # TJL we will have to implement this
+        raise NotImplementedError()
+
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
         cursor.execute("select label from mainTable where CrystalName is '%s'" %xtalID)
@@ -1947,3 +1745,6 @@ class data_source:
             label = l[0]
             break
         return label
+
+
+

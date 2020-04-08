@@ -133,7 +133,7 @@ class setup():
         xce_object.all_columns_in_data_source = XChemDB.data_source(os.path.join
                                                                     (xce_object.database_directory,
                                                                      xce_object.data_source_file)) \
-            .return_column_list()
+            .column_list
         xce_object.albula_button_dict = {}  # using dials.image_viewer instead of albula, but keep name for dictionary
         xce_object.xtalform_dict = {}
 
