@@ -6,7 +6,7 @@ import XChemDB
 class select_columns_to_show(QtGui.QDialog):
     def __init__(self, data_source_file,parent = None):
         super(select_columns_to_show, self).__init__(parent)
-        self.columns_in_data_source=XChemDB.data_source(data_source_file).return_column_list()
+        self.columns_in_data_source=XChemDB.data_source(data_source_file).column_list
 
         self.column_dict={}
 

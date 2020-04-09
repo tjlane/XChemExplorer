@@ -1,10 +1,36 @@
-# last edited: 21/07/2017, 15:00
+
+"""
+
+Summary of TJL Changes
+----------------------
+
+The main goal is to replace the XCE sqlite DB with our MySQL DB where
+appropriate. This essentially means we need to replace two tables that usually
+exist in sqlite with their corresponding fields in MySQL. Those tables are:
+
+  * mainTable
+  * collectionTable
+
+Further, we want to make sure XCE is read-only to the MySQL db, and that all
+needed write functionality is re-directed to sqlite.
+
+I have flagged methods in the class implemented here with one of two
+exceptions:
+
+  * NotImplementedError : means I think we need to re-implement this
+                          method
+
+  * RuntimeError :        I think we don't need this method at all and can
+                          safely ignore it
+"""
 
 import sqlite3
+from mysql.connector import connect
 import os,sys,glob
 import csv
 from datetime import datetime
 import getpass
+import yaml
 
 sys.path.append(os.getenv('XChemExplorer_DIR')+'/lib')
 import XChemLog
@@ -15,60 +41,98 @@ class data_source:
     Hacked apart by TJL to try and get it to work with our SQL DB on <cfeld-vm04.desy.de>
     """
 
-    def __init__(self,data_source_file):
+    def __init__(self, data_source_file, sql_parameters_file='db.yaml'):
 
-        self.data_source_file=data_source_file
+        # local
+        self.data_source_file = data_source_file
+
+        # remote
+        self.login_params = yaml.safe_load( open(sql_parameters_file, 'r') )
+        print('connecting to DESY SQL:', self.login_params)
+        self.cnx = connect(**self.login_params)
+        #cnx.close()
+
+        # ---------------------------------------------------------------------
+        # TJL COMMENT
+        # I have gone through the colum_list (corresponding to the mainTable)
+        # and data_collection_columns (collectionTable) fields by hand and
+        # attempted to match them to names in our database. Fields that I could
+        # not figure out are commented out...
+        #
+        # Additionally, I split the column_list entries into two: one for 
+        # remote access (MySQL) and one for local (sqlite).
+        #
+        # ---------------------------------------------------------------------
 
         #   [column_name in DB, column_name shown in XCE, SQLite column type (Integer,Text,PKEY...)]
-        self.column_list=[
-            # SQLite column name                    XCE column name                             SQLite type             display in overview tab
-            # from Lab36
-            ['ID',                                   'ID',                                      'INTEGER PRIMARY KEY',  0],
-            ['LabVisit',                             'LabVisit',                                'TEXT',                 1],
-            ['LibraryPlate',                         'LibraryPlate',                            'TEXT',                 0],
-            ['SourceWell',                           'SourceWell',                              'TEXT',                 0],
-            ['LibraryName',                          'LibraryName',                             'TEXT',                 1],
-            ['CompoundSMILES',                       'Smiles',                                  'TEXT',                 1],
-            ['CompoundSMILESproduct',                'Smiles - Product',                        'TEXT',                 1],
-            ['CompoundCode',                         'Compound ID',                             'TEXT',                 1],
-            ['CompoundStereo',                       'Compound Stereo',                         'TEXT',                 1],
-            ['CompoundStereoSMILES',                 'Stereo SMILES',                           'TEXT',                 1],
-            ['CompoundStereoCIFprogram',             'Stereo CIF program',                      'TEXT',                 1],
-            ['CompoundStereoCIFs',                   'Compound Stereo IDs',                     'TEXT',                 1],
-            ['CompoundAutofitCC',                    'autofit CC',                              'TEXT',                 1],
-            ['CompoundAutofitprogram',               'autofit program',                         'TEXT',                 1],
-            ['CrystalPlate',                         'CrystalPlate',                            'TEXT',                 1],
-            ['CrystalWell',                          'CrystalWell',                             'TEXT',                 1],
-            ['EchoX',                                'EchoX',                                   'TEXT',                 0],
-            ['EchoY',                                'EchoY',                                   'TEXT',                 0],
-            ['DropVolume',                           'DropVolume',                              'TEXT',                 0],
-            ['ProteinName',                          'ProteinName',                             'TEXT',                 1],
-            ['BatchNumber',                          'BatchNumber',                             'TEXT',                 0],
-            ['CompoundStockConcentration',           'CompoundStockConcentration',              'TEXT',                 0],
-            ['CompoundConcentration',                'CompoundConcentration',                   'TEXT',                 1],
-            ['SolventFraction',                      'SolventFraction',                         'TEXT',                 1],
-            ['SoakTransferVol',                      'SoakTransferVol',                         'TEXT',                 0],
-            ['SoakStatus',                           'SoakStatus',                              'TEXT',                 0],
-            ['SoakTimestamp',                        'SoakTimestamp',                           'TEXT',                 0],
-            ['CryoStockFraction',                    'CryoStockFraction',                       'TEXT',                 0],
-            ['CryoFraction',                         'CryoFraction',                            'TEXT',                 0],
-            ['CryoWell',                             'CryoWell',                                'TEXT',                 0],
-            ['CryoTransferVolume',                   'CryoTransferVolume',                      'TEXT',                 0],
-            ['CryoStatus',                           'CryoStatus',                              'TEXT',                 0],
-            ['CryoTimestamp',                        'CryoTimestamp',                           'TEXT',                 0],
-            ['SoakingTime',                          'SoakingTime',                             'TEXT',                 1],
-            ['HarvestStatus',                        'HarvestStatus',                           'TEXT',                 0],
-            ['CrystalName',                          'Sample ID',                               'TEXT',                 0],
-            ['Puck',                                 'Puck',                                    'TEXT',                 1],
-            ['PuckPosition',                         'PuckPosition',                            'TEXT',                 1],
-            ['PinBarcode',                           'SoakDB\nBarcode',                         'TEXT',                 1],
-            ['MountingResult',                       'MountingResult',                          'TEXT',                 0],
-            ['MountingArrivalTime',                  'MountingArrivalTime',                     'TEXT',                 0],
-            ['MountedTimestamp',                     'MountedTimestamp',                        'TEXT',                 0],
-            ['MountingTime',                         'MountingTime',                            'TEXT',                 0],
-            ['ispybStatus',                          'ispybStatus',                             'TEXT',                 0],
-            ['DataCollectionVisit',                  'Visit',                                   'TEXT',                 1],
 
+        self.remote_column_list=[
+            # DB column name                        XCE column name                             SQLite type             display in overview tab
+            ['ID',                                   'ID',                                      'INTEGER PRIMARY KEY',  0],
+            #['LabVisit',                             'LabVisit',                                'TEXT',                 1],
+            #['source_plate_barcode',                 'LibraryPlate',                            'TEXT',                 0],
+            #['source_plate_well',                    'SourceWell',                              'TEXT',                 0],
+            #['LibraryName',                          'LibraryName',                             'TEXT',                 1],
+            ['smiles',                               'Smiles',                                  'TEXT',                 1],
+            #['CompoundSMILESproduct',                'Smiles - Product',                        'TEXT',                 1],
+            #['CompoundCode',                         'Compound ID',                             'TEXT',                 1],
+            #['CompoundStereo',                       'Compound Stereo',                         'TEXT',                 1],
+            #['CompoundStereoSMILES',                 'Stereo SMILES',                           'TEXT',                 1],
+            #['CompoundStereoCIFprogram',             'Stereo CIF program',                      'TEXT',                 1],
+            #['CompoundStereoCIFs',                   'Compound Stereo IDs',                     'TEXT',                 1],
+            #['CompoundAutofitCC',                    'autofit CC',                              'TEXT',                 1],
+            #['CompoundAutofitprogram',               'autofit program',                         'TEXT',                 1],
+            ['source_plate_barcode',                         'CrystalPlate',                            'TEXT',                 1],
+            ['source_plate_well',                          'CrystalWell',                             'TEXT',                 1],
+            #['EchoX',                                'EchoX',                                   'TEXT',                 0],
+            #['EchoY',                                'EchoY',                                   'TEXT',                 0],
+            #['DropVolume',                           'DropVolume',                              'TEXT',                 0],
+            ['target_name',                          'ProteinName',                             'TEXT',                 1],
+            #['BatchNumber',                          'BatchNumber',                             'TEXT',                 0],
+            #['CompoundStockConcentration',           'CompoundStockConcentration',              'TEXT',                 0],
+            #['CompoundConcentration',                'CompoundConcentration',                   'TEXT',                 1],
+            #['SolventFraction',                      'SolventFraction',                         'TEXT',                 1],
+            #['SoakTransferVol',                      'SoakTransferVol',                         'TEXT',                 0],
+            #['SoakStatus',                           'SoakStatus',                              'TEXT',                 0],
+            #['SoakTimestamp',                        'SoakTimestamp',                           'TEXT',                 0],
+            #['CryoStockFraction',                    'CryoStockFraction',                       'TEXT',                 0],
+            #['CryoFraction',                         'CryoFraction',                            'TEXT',                 0],
+            #['CryoWell',                             'CryoWell',                                'TEXT',                 0],
+            #['CryoTransferVolume',                   'CryoTransferVolume',                      'TEXT',                 0],
+            #['CryoStatus',                           'CryoStatus',                              'TEXT',                 0],
+            #['CryoTimestamp',                        'CryoTimestamp',                           'TEXT',                 0],
+            #['SoakingTime',                          'SoakingTime',                             'TEXT',                 1],
+            #['HarvestStatus',                        'HarvestStatus',                           'TEXT',                 0],
+            ['crystal_id',                           'Sample ID',                               'TEXT',                 0],
+            ['puck_id',                              'Puck',                                    'TEXT',                 1],
+            ['puck_position_id',                     'PuckPosition',                            'TEXT',                 1],
+            #['PinBarcode',                           'SoakDB\nBarcode',                         'TEXT',                 1],
+            #['MountingResult',                       'MountingResult',                          'TEXT',                 0],
+            #['MountingArrivalTime',                  'MountingArrivalTime',                     'TEXT',                 0],
+            #['MountedTimestamp',                     'MountedTimestamp',                        'TEXT',                 0],
+            #['MountingTime',                         'MountingTime',                            'TEXT',                 0],
+            #['ispybStatus',                          'ispybStatus',                             'TEXT',                 0],
+            #['DataCollectionVisit',                  'Visit',                                   'TEXT',                 1],
+
+            ['beamline',                             'Beamline',                                'TEXT',                 0],
+            #['DataCollectionDate',                   'Data Collection\nDate',                   'TEXT',                 1],
+            #['DataCollectionOutcome',                'DataCollection\nOutcome',                 'TEXT',                 1],
+            #['DataCollectionRun',                    'Run',                                     'TEXT',                 0],
+            #['DataCollectionComment',                'DataCollection\nComment',                 'TEXT',                 0],
+            #['DataCollectionWavelength',             'Wavelength',                              'TEXT',                 0],
+            #['DataCollectionPinBarcode',             'GDA\nBarcode',                            'TEXT',                 1],
+
+            ['DataCollectionCrystalImage1', 'img1', 'TEXT', 1],
+            ['DataCollectionCrystalImage2', 'img2', 'TEXT', 1],
+            ['DataCollectionCrystalImage3', 'img3', 'TEXT', 1],
+            ['DataCollectionCrystalImage4', 'img4', 'TEXT', 1],
+
+            ['DataProcessingPathToImageFiles',       'Path to diffraction\nimage files',        'TEXT',                 1],
+        ] 
+
+            # -------------------------------------------------------------------------------------------------------------
+            # TJL : we need to put these in the local DB or ask those guys to make new fields 
+        self.local_column_list = [
             # from XChemExplorer
 
             ['ProjectDirectory',                     'ProjectDirectory',                        'TEXT',                 0],
@@ -85,20 +149,6 @@ class data_source:
             ['CrystalFormGamma',                     'gamma',                                   'TEXT',                 0],
             ['CrystalFormVolume',                    'Crystal Form\nVolume',                    'TEXT',                 0],
 
-            ['DataCollectionBeamline',               'Beamline',                                'TEXT',                 0],
-            ['DataCollectionDate',                   'Data Collection\nDate',                   'TEXT',                 1],
-            ['DataCollectionOutcome',                'DataCollection\nOutcome',                 'TEXT',                 1],
-            ['DataCollectionRun',                    'Run',                                     'TEXT',                 0],
-            ['DataCollectionComment',                'DataCollection\nComment',                 'TEXT',                 0],
-            ['DataCollectionWavelength',             'Wavelength',                              'TEXT',                 0],
-            ['DataCollectionPinBarcode',             'GDA\nBarcode',                            'TEXT',                 1],
-
-            ['DataCollectionCrystalImage1', 'img1', 'TEXT', 1],
-            ['DataCollectionCrystalImage2', 'img2', 'TEXT', 1],
-            ['DataCollectionCrystalImage3', 'img3', 'TEXT', 1],
-            ['DataCollectionCrystalImage4', 'img4', 'TEXT', 1],
-
-            ['DataProcessingPathToImageFiles',       'Path to diffraction\nimage files',        'TEXT',                 1],
             ['DataProcessingProgram',                'Program',                                 'TEXT',                 1],
             ['DataProcessingSpaceGroup',             'DataProcessing\nSpaceGroup',              'TEXT',                 1],
             ['DataProcessingUnitCell',               'DataProcessing\nUnitCell',                'TEXT',                 0],
@@ -216,13 +266,15 @@ class data_source:
             ['Deposition_mmCIF_model_file',                 'Deposition_mmCIF_model_file',                  'TEXT',                 0],
             ['Deposition_mmCIF_SF_file',                    'Deposition_mmCIF_SF_file',                     'TEXT',                 0],
 
-            ['Label',                                       'Label',                                        'TEXT',                 0],
-            ['table_one',                                   'table_one',                                    'TEXT',                 0],
+            #['Label',                                       'Label',                                        'TEXT',                 0],
+            #['table_one',                                   'table_one',                                    'TEXT',                 0],
 
-            ['AssayIC50',                                   'AssayIC50',                                    'TEXT',                 0],
-            ['LastUpdated',                                 'LastUpdated',                                  'TEXT',                 0],
-            ['LastUpdated_by',                              'LastUpdated_by',                               'TEXT',                 0]
-        ]
+            #['AssayIC50',                                   'AssayIC50',                                    'TEXT',                 0],
+            #['LastUpdated',                                 'LastUpdated',                                  'TEXT',                 0],
+            #['LastUpdated_by',                              'LastUpdated_by',                               'TEXT',                 0]
+
+            # --------------------------------------------------------------------------------------------------------------
+]
 
         self.pandda_table_columns = [
             ['ID',                                          'ID',                                       'INTEGER PRIMARY KEY'],
@@ -491,6 +543,12 @@ class data_source:
         ]
 
 
+    @property
+    def column_list(self):
+        # tjl addition to maintain xface
+        return self.remote_column_list + self.local_column_list
+
+
     def columns_not_to_display(self):
         do_not_display = []
         for column in self.column_list:
@@ -514,7 +572,7 @@ class data_source:
         tableDict = {   #'mainTable':        self.column_list,
                         'panddaTable':      self.pandda_table_columns,
                         'depositTable':     self.deposition_table_columns,
-                        'collectionTable':  self.data_collection_columns,
+                        #'collectionTable':  self.data_collection_columns,
                         'zenodoTable':      self.zenodo_table_columns,
                         'labelTable':       self.label_table_columns    }
 
@@ -537,17 +595,9 @@ class data_source:
 
 
     def create_empty_data_source_file(self):
-
         # TJL : this is creating the data table, which we should not need....
         raise RuntimeError('disabled by TJL, should not be needed')
 
-        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
-        with connect:
-            cursor = connect.cursor()
-            cursor.execute("CREATE TABLE mainTable("+self.column_list[0][0]+' '+self.column_list[0][2]+")")
-            for i in range(1,len(self.column_list)):
-                cursor.execute("alter table mainTable add column '"+self.column_list[i][0]+"' '"+self.column_list[i][2]+"'")
-            connect.commit()
 
     def get_all_samples_in_data_source_as_list(self):
 
@@ -942,42 +992,8 @@ class data_source:
 
 
     def update_insert_not_null_fields_only(self,sampleID,data_dict):
-
         raise RuntimeError('disabled by TJL')
 
-        data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
-        data_dict['LastUpdated_by']=getpass.getuser()
-        connect=sqlite3.connect(self.data_source_file)
-        cursor = connect.cursor()
-        cursor.execute('Select CrystalName FROM mainTable')
-        available_columns=[]
-        cursor.execute("SELECT * FROM mainTable")
-        for column in cursor.description:           # only update existing columns in data source
-            available_columns.append(column[0])
-        if self.check_if_sample_exists_in_data_source(sampleID):
-            for key in data_dict:
-                value=data_dict[key]
-#                print value
-                if key=='ID' or key=='CrystalName':
-                    continue
-                if not str(value).replace(' ','')=='':  # ignore empty fields
-                    update_string=str(key)+'='+"'"+str(value)+"'"
-#                    cursor.execute("UPDATE mainTable SET "+update_string+" WHERE CrystalName="+"'"+sampleID+"' and "+str(key)+" is null;")
-                    cursor.execute("UPDATE mainTable SET "+update_string+" WHERE CrystalName="+"'"+sampleID+"' and ("+str(key)+" is null or "+str(key)+"='');")
-        else:
-            column_string='CrystalName'+','
-            value_string="'"+sampleID+"'"+','
-            for key in data_dict:
-                value=data_dict[key]
-                if key=='ID':
-                    continue
-                if key not in available_columns:
-                    continue
-                if not str(value).replace(' ','')=='':  # ignore if nothing in csv field
-                    value_string+="'"+str(value)+"'"+','
-                    column_string+=key+','
-            cursor.execute("INSERT INTO mainTable ("+column_string[:-1]+") VALUES ("+value_string[:-1]+");")
-        connect.commit()
 
     def get_value_from_field(self,sampleID,column):
 
@@ -1066,20 +1082,6 @@ class data_source:
             outcome = " '{0!s}' ".format(RefinementOutcome)
 
         if int(pandda_site) > 0:
-#            sqlite = (
-#                "select"
-#                " mainTable.CrystalName,"
-#                " mainTable.CompoundCode,"
-#                " mainTable.RefinementCIF,"
-#                " mainTable.RefinementMTZfree,"
-#                " mainTable.RefinementPathToRefinementFolder,"
-#                " panddaTable.RefinementOutcome, "
-#                " panddaTable.PANDDA_site_confidence "
-#                "from mainTable inner join panddaTable on mainTable.CrystalName = panddaTable.CrystalName "
-#                "where panddaTable.PANDDA_site_index is '%s'" %pandda_site+
-#                " and panddaTable.PANDDA_site_ligand_placed is 'True'"
-#                " and panddaTable.RefinementOutcome is %s;" %outcome
-#                )
             sqlite = (
                 "select"
                 " mainTable.CrystalName,"
@@ -1094,19 +1096,6 @@ class data_source:
                 " and panddaTable.PANDDA_site_ligand_placed is 'True'"
                 " and panddaTable.RefinementOutcome like "+outcome.split()[0]+"%';"
                 )
-#            sqlite = (
-#                "select"
-#                " mainTable.CrystalName,"
-#                " mainTable.CompoundCode,"
-#                " mainTable.RefinementCIF,"
-#                " mainTable.RefinementMTZfree,"
-#                " mainTable.RefinementPathToRefinementFolder,"
-#                " panddaTable.RefinementOutcome, "
-#                " panddaTable.PANDDA_site_confidence "
-#                "from mainTable inner join panddaTable on mainTable.CrystalName = panddaTable.CrystalName "
-#                "where panddaTable.PANDDA_site_index is '%s'" %pandda_site+
-#                " and panddaTable.RefinementOutcome like "+outcome.split()[0]+"%';"
-#                )
         else:
             sqlite = (
                 "select"
@@ -1273,30 +1262,7 @@ class data_source:
         return site_list
 
     def export_csv_for_WONKA(self):
-        SQLite =    (   "select"
-                        " panddaTable.PANDDA_site_ligand_resname,"
-                        " panddaTable.PANDDA_site_ligand_sequence_number,"
-                       	" panddaTable.PANDDA_site_ligand_chain,"
-                        " panddaTable.RefinementOutcome,"
-                        " mainTable.CompoundSMILES,"
-                        " mainTable.RefinementBoundConformation,"
-                        " panddaTable.PANDDA_site_initial_mtz,"
-                        " panddaTable.PANDDA_site_event_map,"
-                        " panddaTable.CrystalName,"
-                        " mainTable.CompoundCode "
-                        "from"
-                        " mainTable inner join panddaTable on mainTable.CrystalName = panddaTable.CrystalName "
-                        "where"
-                        " (panddaTable.RefinementOutcome like '3%' or panddaTable.RefinementOutcome like '4%' or panddaTable.RefinementOutcome like '5%')" )
-        connect=sqlite3.connect(self.data_source_file)
-        cursor = connect.cursor()
-        cursor.execute(SQLite)
-        header=()
-        for column in cursor.description:
-            header+=(column[0],)
-        rows = cursor.fetchall()
-        csvWriter = csv.writer(open('for_wonka.csv', "w"))
-        csvWriter.writerows([header]+rows)
+        raise RuntimeError('disabled by TJ')
 
     def create_missing_apo_records_in_depositTable(self,xce_logfile):
         Logfile=XChemLog.updateLog(xce_logfile)
@@ -1378,29 +1344,6 @@ class data_source:
         else:
             Logfile.insert('did not find any new apo structures')
 
-#        if apoStructureList==[]:
-#            Logfile.insert('no apo structures were assigned to your pandda models')
-#        else:
-#            Logfile.insert('the following datasets were at some point used as apo structures for pandda.analyse: '+str(apoStructureList))
-#            apoInDB=[]
-#            cursor.execute("select CrystalName from depositTable where StructureType is 'apo'")
-#            tmp = cursor.fetchall()
-#            for xtal in tmp:
-#                Logfile.insert(str(xtal[0])+' exists as entry for apo structure in database')
-#                apoInDB.append(str(xtal[0]))
-#            newEntries=''
-#            for xtal in apoStructureList:
-#                if xtal not in apoInDB:
-#                    Logfile.insert('no entry for '+xtal+' in depositTable')
-#                    newEntries+="('%s','apo')," %xtal
-#            if newEntries != '':
-#                sqlite='insert into depositTable (CrystalName,StructureType) values %s;' %newEntries[:-1]
-#                Logfile.insert('creating new entries with the following SQLite command:\n'+sqlite)
-#                cursor.execute(sqlite)
-#                connect.commit()
-
-#    def get_deposit_dict_for_xtal(self,sampleID,structure_type):
-
     def create_or_remove_missing_records_in_depositTable(self,xce_logfile,xtal,type,db_dict):
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
@@ -1460,31 +1403,9 @@ class data_source:
 
     def collected_xtals_during_visit(self,visitID):
         raise RuntimeError('disabled by TJL, doesnt make sense in our context')
-        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
-        cursor = connect.cursor()
-        cursor.execute("select CrystalName from collectionTable where DataCollectionVisit = '{0!s}'".format(visitID))
-        collectedXtals=[]
-        samples = cursor.fetchall()
-        for sample in samples:
-            if str(sample[0]) not in collectedXtals:
-                collectedXtals.append(str(sample[0]))
-        return collectedXtals
 
     def collected_xtals_during_visit_for_scoring(self,visit):
         raise RuntimeError('disabled by TJL, doesnt make sense in our context')
-        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
-        cursor = connect.cursor()
-        xtalList = []
-#        if rescore == True:
-#            cursor.execute("select CrystalName from mainTable where DataCollectionVisit = '%s'" %visit)
-#        else:
-#            cursor.execute("select CrystalName from mainTable where DataProcessingAutoAssigned = 'True' and DataCollectionVisit = '%s'" %visit)
-        cursor.execute("select distinct CrystalName from collectionTable where DataCollectionVisit = '%s'" %visit)
-        samples = cursor.fetchall()
-        for sample in samples:
-            if str(sample[0]) not in xtalList:
-                xtalList.append(str(sample[0]))
-        return xtalList
 
     def autoprocessing_result_user_assigned(self,sample):
 
@@ -1507,46 +1428,13 @@ class data_source:
 
 
     def all_results_of_xtals_collected_during_visit_as_dict(self,visitID):
-
         raise RuntimeError('we dont need this')
 
-        # first get all collected xtals as list
-        collectedXtals = self.collected_xtals_during_visit(visitID)
-        xtalDict = {}
-        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
-        cursor = connect.cursor()
-        for xtal in sorted(collectedXtals):
-            if xtal not in xtalDict:
-                xtalDict[xtal] = []
-            sqlite = ("select DataCollectionVisit,"
-                      "       DataCollectionRun,"
-                      "       DataProcessingProgram,"
-                      "       DataCollectionDate,"
-                      "       DataProcessingResolutionHigh,"
-                      "       DataProcessingRmergeLow,"
-                      "       DataCollectionCrystalImage1,"
-                      "       DataCollectionCrystalImage2,"
-                      "       DataCollectionCrystalImage3,"
-                      "       DataCollectionCrystalImage4 "
-                      "from collectionTable "
-                      "where CrystalName = '%s'" % xtal)
-#            print sqlite
-            cursor.execute(sqlite)
-            sq = cursor.fetchall()
-#            print sq
-            for s in sq:
-#                print s
-                t=[str(s[0]),str(s[1]),str(s[2]),str(s[3]),str(s[4]),str(s[5]),str(s[6]),str(s[7]),str(s[8]),str(s[9])]
-                inDict = False
-                for entry in xtalDict[xtal]:
-                    if t[0] == entry[0] and t[1] == entry[1] and t[2] == entry[2]:
-                        inDict = True
-                        break
-                if not inDict:
-                    xtalDict[xtal].append(t)
-        return xtalDict
 
     def all_autoprocessing_results_for_xtal_as_dict(self,xtal):
+
+        raise NotImplementedError()
+
         dbList = []
         header=[]
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
@@ -1580,7 +1468,7 @@ class data_source:
 
     def get_db_dict_for_visit_run_autoproc(self,xtal,visit,run,autoproc):
 
-        raise RuntimeError('dont need this')
+        raise NotImplementedError('change collectionTable --> mainTable')
 
         db_dict = {}
         header=[]
@@ -1602,7 +1490,8 @@ class data_source:
 
     def xtals_collected_during_visit_as_dict(self,visitID):
 
-        raise RuntimeError('dont need this')
+        # we need this, I think
+        raise NotImplementedError()
 
         # first get all collected xtals as list
         if isinstance(visitID,list):    # for Agamemnon data structure
@@ -1745,6 +1634,5 @@ class data_source:
             label = l[0]
             break
         return label
-
 
 

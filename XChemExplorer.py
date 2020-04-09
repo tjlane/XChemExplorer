@@ -2335,9 +2335,8 @@ class XChemExplorer(QtGui.QApplication):
     def select_datasource_columns_to_display(self):
         columns_to_show = QtGui.QMessageBox()
         columns_to_showLayout = columns_to_show.layout()
-        columns_in_data_source = self.db.return_column_list()
         try:
-            columns_in_data_source = self.db.return_column_list()
+            columns_in_data_source = self.db.column_list
         except AttributeError:
             print('==> XCE: please select a datasource file')
             self.status_bar.showMessage('please select a datasource file')
