@@ -7,6 +7,16 @@
 <i> "The XChemExplorer graphical workflow tool for routine or large-scale protein-ligand structure determination." </i>
 <p>Acta Crystallogr D Struct Biol. 2017 Mar 1;73(Pt 3):267-278. (https://doi.org/10.1107/S2059798316020234)</p> 
 
+## TJs Notes
+
+```
+ccp4-python -m pip uninstall panddas
+ccp4-python -m pip install pip -–upgrade
+ccp4-python -m pip install numpy -–upgrade
+ccp4-python -m pip install panddas
+ccp4-python -m pip install mysql-connector-python
+```
+
 ## Scope 
 
 XChemExplorer (XCE) is a data-management and workflow tool to support large-scale simultaneous analysis of protein-ligand complexes during structure-based ligand discovery (SBLD). 

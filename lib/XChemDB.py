@@ -181,6 +181,21 @@ class data_source:
             ['CrystalFormGamma',                     'gamma',                                   'TEXT',                 0],
             ['CrystalFormVolume',                    'Crystal Form\nVolume',                    'TEXT',                 0],
 
+            ['DataCollectionBeamline',               'Beamline',                                'TEXT',                 0],
+            ['DataCollectionDate',                   'Data Collection\nDate',                   'TEXT',                 1],
+            ['DataCollectionOutcome',                'DataCollection\nOutcome',                 'TEXT',                 1],
+            ['DataCollectionRun',                    'Run',                                     'TEXT',                 0],
+            ['DataCollectionSubdir',                 'SubDir',                                  'TEXT',                 0],
+            ['DataCollectionComment',                'DataCollection\nComment',                 'TEXT',                 0],
+            ['DataCollectionWavelength',             'Wavelength',                              'TEXT',                 0],
+            ['DataCollectionPinBarcode',             'GDA\nBarcode',                            'TEXT',                 1],
+
+            ['DataCollectionCrystalImage1', 'img1', 'TEXT', 1],
+            ['DataCollectionCrystalImage2', 'img2', 'TEXT', 1],
+            ['DataCollectionCrystalImage3', 'img3', 'TEXT', 1],
+            ['DataCollectionCrystalImage4', 'img4', 'TEXT', 1],
+
+            ['DataProcessingPathToImageFiles',       'Path to diffraction\nimage files',        'TEXT',                 1],
             ['DataProcessingProgram',                'Program',                                 'TEXT',                 1],
             ['DataProcessingSpaceGroup',             'DataProcessing\nSpaceGroup',              'TEXT',                 1],
             ['DataProcessingUnitCell',               'DataProcessing\nUnitCell',                'TEXT',                 0],
@@ -382,6 +397,7 @@ class data_source:
             ['contact_author_PI_Country',                   'contact_author_PI_Country',                'TEXT'],
             ['contact_author_PI_fax_number',                'contact_author_PI_fax_number',             'TEXT'],
             ['contact_author_PI_phone_number',              'contact_author_PI_phone_number',           'TEXT'],
+            ['contact_author_PI_ORCID',                     'contact_author_PI_ORCID',                  'TEXT'],
 
             ['contact_author_salutation',                   'contact_author_salutation',                'TEXT'],
             ['contact_author_first_name',                   'contact_author_first_name',                'TEXT'],
@@ -398,6 +414,7 @@ class data_source:
             ['contact_author_Country',                      'contact_author_Country',                   'TEXT'],
             ['contact_author_fax_number',                   'contact_author_fax_number',                'TEXT'],
             ['contact_author_phone_number',                 'contact_author_phone_number',              'TEXT'],
+            ['contact_author_ORCID',                        'contact_author_ORCID',                     'TEXT'],
 
             ['Release_status_for_coordinates',              'Release_status_for_coordinates',           'TEXT'],
             ['Release_status_for_structure_factor',         'Release_status_for_structure_factor',      'TEXT'],
@@ -497,6 +514,7 @@ class data_source:
 
             ['DataCollectionVisit',                    'Visit',                                     'TEXT',                 0],
             ['DataCollectionRun',                    'Run',                                     'TEXT',                 0],
+            ['DataCollectionSubdir',                    'SubDir',                                     'TEXT',                 0],
             ['DataCollectionBeamline',               'Beamline',                                'TEXT',                 0],
             ['DataCollectionOutcome',                'DataCollection\nOutcome',                 'TEXT',                 1],
             ['DataCollectionDate',                   'Data Collection\nDate',                   'TEXT',                 1],
@@ -701,11 +719,11 @@ class data_source:
         data=[]
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
-        if sampleID == 'ground-state':      # just select first row in depositTable
-            cursor.execute("SELECT * FROM depositTable ORDER BY ROWID ASC LIMIT 1;")
-        else:
-            cursor.execute("select * from depositTable where CrystalName='{0!s}';".format(sampleID))
-
+#        if sampleID == 'ground-state':      # just select first row in depositTable
+#            cursor.execute("SELECT * FROM depositTable ORDER BY ROWID ASC LIMIT 1;")
+#        else:
+#            cursor.execute("select * from depositTable where CrystalName='{0!s}';".format(sampleID))
+        cursor.execute("select * from depositTable where CrystalName='{0!s}';".format(sampleID))
         for column in cursor.description:
             header.append(column[0])
         data = cursor.fetchall()
@@ -1523,6 +1541,9 @@ class data_source:
                 Logfile.insert('entry for ground-state model in depositTable does not exist')
             else:
                 Logfile.warning('entry for ground-state model in depositTable does already exist')
+                Logfile.warning('updating PDB, MTZ and DimplePANDDApath for ground-state entry')
+                cursor.execute("update depositTable set PDB_file='%s', MTZ_file='%s', DimplePANDDApath='%s' where StructureType='ground_state'" %(db_dict['PDB_file'],db_dict['MTZ_file'],db_dict['DimplePANDDApath']))
+                connect.commit()
                 return
 
         cursor.execute("select CrystalName,StructureType from depositTable where CrystalName is '{0!s}' and StructureType is '{1!s}'".format(xtal, type))

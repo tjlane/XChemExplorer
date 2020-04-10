@@ -1,3 +1,102 @@
+v1.5.17 (07/04/2020)
+- add option to specify $SampleID in structure deposition title
+
+v1.5.16 (06/04/2020)
+- XChemThread: copy un-merged MTZ file for xia2, dials & 3d(ii)
+- XChemThread: change parsing of auto-processing results to enable reading of multiple runs with same name, e.g. xia-3dii
+- bug fix: enable 3dii only selection of auto-processing results
+- remove xia2-3d only auto-processing selection option
+
+v1.5.15 (06/04/2020)
+- bug fix: found instance in pandda_inspect_events.csv where sites/ events displayed as float instead of int; added fix
+
+v1.5.14 (14/03/2020)
+- HTML export: enable changing of contour level of event maps
+- HTML export: set ligand confidence to "not assigned" for deposition ready model that have "0 - no ligand bound"
+
+v1.5.13 (11/03/2020)
+- bug fix: include covlinks argument is None in XChemPANDDA quickRefine
+
+v1.5.12 (10/03/2020)
+- DIMPLE: added pointless step before dimple to reindex according to ref_pdb if necessary
+
+v1.5.11 (10/03/2020)
+- added linking of covalent binders for PanDDA models (refine.split-bound.pdb)
+- remove links to refine.output... PDB files after refinement
+
+v1.5.10 (05/03/2020)
+- bug fix: correct name of event map in files directory
+
+v1.5.9 (05/03/2020)
+- bug fix: reading of .json scaling logfiles enabled during 'update database from filesystem'
+
+v1.5.8 (04/03/2020)
+- added Taxonomy ID for mus musculus
+
+v1.5.7 (03/03/2020)
+- bug fix: capture all available event maps during html export
+
+v1.5.6 (02/03/2020)
+- added Taxonomy ID for BAT SARS-LIKE CORONAVIRUS and COVID-19
+
+v1.5.5 (27/02/2020)
+- bug fix: update depositTable with ground_state_sf.mmcif if successfully created
+
+v1.5.4 (27/02/2020)
+- bug fix: iotbx spg symbol for H32 needed changing for unique step of initial map calculation
+
+v1.5.3 (26/02/2020)
+- bug fix: read spacegroup as H32 from xia2.mmcif ('R 3 2 :H')
+
+v1.5.2 (25/02/2020)
+- bug fix: correct determination of staraniso runs for different space groups
+
+v1.5.1 (24/02/2020)
+- enable parsing of autoPROC/ staraniso auto-processing results with specific space groups applied (e.g. autoPROC-P21)
+- bug fix: names of auto-processing pipelines get now correctly determined
+
+v1.5.0 (20/02/2020)
+- ground-state mean maps are EXCLUDED from apo deposition, because either map2mtz conversion was faulty or columns were missing; moreover, they are not required to reproduce the maps and users can deposit them separately on ZENODO if they want
+
+v1.4.10 (18/02/2020)
+- XChemDeposit: remove _pdbx_related_exp_data_set block because PanDDA ZENODO upload is not required
+- XChemDeposit: add _pdbx_contact_author.identifier_ORCID field
+- XChemDeposit: add pdbx_keywords dropdown
+- added helper script to reset occupancy of all protein residues with single conformer to 1.00
+- XChemDeposit: add ligand cif file to structure mmcif file
+
+v1.4.9 (13/02/2020)
+- bug fix: corrected DataProcessingUnitCellVolume calculation from merging-statistics.json file for trigonal lattice
+- show only 'resolution high' in tables because formatting for resolution at 1.5 or 2.0 I/sig(I) inconsistent in aimless logfiles and not reported in dials scaling logile
+
+v1.4.8 (07/02/2020)
+- bug fix: default labxchem folders are only selected if xce starts in /dls/labxchem/...; just having labxchem in current directory string is not sufficient
+
+v1.4.7 (07/02/2020)
+- added script to helpers which can replace residues in bound and ground state based on a new reference model (change_residues_in_ground_and_bound-state.py); cannot be called from GUI at the moment
+
+v1.4.6 (21/01/2020)
+- added xia2-* wildcard to read_write_autoprocessing_results_from_to_disc because autoprocessing folder names changed
+- added parsing of DIALS JSON merging statistics file and MMCIF cell parameter file
+- added 'recollect' folder for parsing of auto-collections
+
+v1.4.5 (16/01/2020)
+- bug fix: removing and re-parsing of folders from project directory does not need the DataProcessingAutoAssigned flag to be reset if the MTZ file does not exist
+
+v1.4.4 (10/01/2020)
+- bug fix: corrected pandda.analyse keyword 'exclude_from_z_map_analysis'
+
+v1.4.3 (10/01/2020)
+- added additional error message during pandda.export in case of missing ensemble model
+
+v1.4.2 (17/12/2019)
+- bug fix: arbitrary clicking order for atoms making a new covalent link
+
+v1.4.1 (16/12/2019)
+- bug fix: in helpers/assign_stereochemistry.py; use CompoundSMILES instead of CompoundSMILESproduct (which need to be provided by user)
+- bug fix: auto-fitting of ligands - use default ccp4 distribition and submission command
+- bug fix: add 'module load mx' to restraints generation script; uses default ccp4 installation, otherwise CLIB path for GRADE broken
+
 v1.4.0 (03/12/2019)
 - introduced simple semantic versioning according to https://semver.org
 

@@ -30,7 +30,7 @@ class setup():
 
     def settings(self, xce_object):
         # set XCE version
-        xce_object.xce_version = 'v1.4.0'
+        xce_object.xce_version = 'v1.5.17'
 
         # general settings
         xce_object.allowed_unitcell_difference_percent = 12
@@ -46,7 +46,8 @@ class setup():
         xce_object.xce_logfile = os.path.join(xce_object.current_directory, 'xce.log')
 
         # if in the correct place, set the various directories
-        if 'labxchem' in xce_object.current_directory:
+        if xce_object.current_directory.startswith('/dls/labxchem'):
+#        if 'labxchem' in xce_object.current_directory:
             if len(xce_object.current_directory.split('/')) >= 9 and xce_object.current_directory.split('/')[6] == 'processing' and xce_object.current_directory.split('/')[8] == 'processing':
                 xce_object.labxchem_directory = '/' + os.path.join(
                         *xce_object.current_directory.split('/')[1:8])  # need splat operator: *
@@ -70,8 +71,11 @@ class setup():
             xce_object.database_directory = os.path.join(xce_object.labxchem_directory, 'processing', 'database')
             xce_object.panddas_directory = os.path.join(xce_object.labxchem_directory, 'processing', 'analysis',
                                                         'panddas')
-            xce_object.datasets_summary_file = os.path.join(xce_object.database_directory,
-                                                            str(os.getcwd().split('/')[5]) + '_summary.pkl')
+
+
+            xce_object.datasets_summary_file = None
+#            xce_object.datasets_summary_file = os.path.join(xce_object.database_directory,
+#                                                            str(os.getcwd().split('/')[5]) + '_summary.pkl')
             xce_object.data_source_file = ''
             xce_object.html_export_directory = os.path.join(xce_object.labxchem_directory, 'processing', 'html')
             xce_object.group_deposit_directory = os.path.join(xce_object.labxchem_directory, 'processing',
@@ -222,7 +226,7 @@ class setup():
                                                       'highest_resolution',
                                                       'lowest_Rfree',
                                                       'dials - only',
-                                                      'xia2 3d - only',
+#                                                      'xia2 3d - only',
                                                       'xia2 3dii - only',
                                                       'autoProc - only',
                                                       'autoProc_staraniso - only']
@@ -301,7 +305,8 @@ class setup():
         #                                            - appears in create_widgets_for_autoprocessing_results_only()
 
         xce_object.datasets_summary_table_columns = ['Sample ID',
-                                                     'Resolution\n[Mn<I/sig(I)> = 2.0]',
+#                                                     'Resolution\n[Mn<I/sig(I)> = 2.0]',
+                                                     'Resolution\nHigh',
                                                      'DataProcessing\nSpaceGroup',
                                                      'DataProcessing\nRfree',
                                                      'SoakDB\nBarcode',
@@ -345,7 +350,8 @@ class setup():
         xce_object.datasets_reprocess_columns = ['Dataset ID',
                                                  'Sample ID',
                                                  'Run\nxia2',
-                                                 'Resolution\n[Mn<I/sig(I)> = 1.5]',
+#                                                 'Resolution\n[Mn<I/sig(I)> = 1.5]',
+                                                 'Resolution\nHigh',
                                                  'Rmerge\nLow',
                                                  'Dimple\nRfree',
                                                  'DataProcessing\nSpaceGroup',
@@ -360,7 +366,8 @@ class setup():
                                          'Select',
                                          'Compound ID',
                                          'Smiles',
-                                         'Resolution\n[Mn<I/sig(I)> = 1.5]',
+#                                         'Resolution\n[Mn<I/sig(I)> = 1.5]',
+                                         'Resolution\nHigh',
                                          'Dimple\nRcryst',
                                          'Dimple\nRfree',
                                          'DataProcessing\nSpaceGroup',

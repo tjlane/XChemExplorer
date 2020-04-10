@@ -103,7 +103,7 @@ class run_pandda_export(QtCore.QThread):
                         os.chdir(os.path.join(self.initial_model_directory,xtal,'cootOut','Refine_'+str(Serial)))
                     Refine=XChemRefine.panddaRefine(self.initial_model_directory,xtal,compoundID,self.datasource)
                     os.symlink(os.path.join(self.initial_model_directory,xtal,xtal+'-ensemble-model.pdb'),xtal+'-ensemble-model.pdb')
-                    Refine.RunQuickRefine(Serial,self.RefmacParams,self.external_software,self.xce_logfile,'pandda_refmac')
+                    Refine.RunQuickRefine(Serial,self.RefmacParams,self.external_software,self.xce_logfile,'pandda_refmac',None)
 
 #            elif xtal in os.path.join(self.panddas_directory,'processed_datasets',xtal,'modelled_structures',
 #                                      '{}-pandda-model.pdb'.format(xtal)):
@@ -111,6 +111,9 @@ class run_pandda_export(QtCore.QThread):
 #                                   ' does not have a modelled structure. Check whether you expect this dataset to ' +
 #                                   ' have a modelled structure, compare pandda.inspect and datasource,'
 #                                   ' then tell XCHEMBB ')
+                else:
+                    self.Logfile.error('%s: cannot find %s-ensemble-model.pdb; cannot start refinement...' %(xtal,xtal))
+                    self.Logfile.error('Please check terminal window for any PanDDA related tracebacks')
 
             elif xtal in samples_to_export and not os.path.isfile(
                     os.path.join(self.initial_model_directory, xtal, xtal + '.free.mtz')):
@@ -139,12 +142,14 @@ class run_pandda_export(QtCore.QThread):
 
         with open(os.path.join(self.panddas_directory,'analyses','pandda_inspect_sites.csv'),'rb') as csv_import:
             csv_dict = csv.DictReader(csv_import)
+            self.Logfile.insert('reding pandda_inspect_sites.csv')
             for i,line in enumerate(csv_dict):
+                self.Logfile.insert(str(line).replace('\n','').replace('\r',''))
                 site_index=line['site_idx']
                 name=line['Name'].replace("'","")
                 comment=line['Comment']
                 site_list.append([site_index,name,comment])
-
+                self.Logfile.insert('add to site_list_:' + str([site_index,name,comment]))
 
         progress_step=1
         for i,line in enumerate(open(os.path.join(self.panddas_directory,'analyses','pandda_inspect_events.csv'))):
@@ -168,8 +173,9 @@ class run_pandda_export(QtCore.QThread):
                     continue
                 if sampleID not in pandda_hit_list:
                     pandda_hit_list.append(sampleID)
-                site_index=line['site_idx']
-                event_index=line['event_idx']
+                site_index=str(line['site_idx']).replace('.0','')
+                event_index=str(line['event_idx']).replace('.0','')
+                self.Logfile.insert(str(line))
                 self.Logfile.insert('reading {0!s} -> site {1!s} -> event {2!s}'.format(sampleID, site_index, event_index))
 
                 for entry in site_list:
@@ -507,7 +513,7 @@ class run_pandda_analyse(QtCore.QThread):
             char_string = 'exclude_from_characterisation="'
             char_string = append_to_ignore_string(char, char_string)
 
-            zmap_string = 'exclude_from_zmap_analysis="'
+            zmap_string = 'exclude_from_z_map_analysis="'
             zmap_string = append_to_ignore_string(zmap, zmap_string)
 
             for i in range(number_of_cyles):
@@ -1136,6 +1142,7 @@ class convert_apo_structures_to_mmcif(QtCore.QThread):
         self.Logfile=XChemLog.updateLog(xce_logfile)
 
     def sf_convert_environment(self):
+        pdb_extract_init = ''
         if os.path.isdir('/dls'):
             pdb_extract_init = 'source /dls/science/groups/i04-1/software/pdb-extract-prod/setup.sh\n'
             pdb_extract_init += '/dls/science/groups/i04-1/software/pdb-extract-prod/bin/sf_convert'

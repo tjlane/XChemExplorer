@@ -496,6 +496,11 @@ def linkAutoProcessingResult(xtal,dbDict,projectDir,xce_logfile):
     Logfile=XChemLog.updateLog(xce_logfile)
 
     run =      dbDict['DataCollectionRun']
+    subDir =   dbDict['DataCollectionSubdir']
+    if subDir != '':
+        procCode = '_' + subDir
+    else:
+        procCode = ''
     visit =    dbDict['DataCollectionVisit']
     autoproc = dbDict['DataProcessingProgram']
     mtzFileAbs = dbDict['DataProcessingPathToMTZfile']
@@ -509,18 +514,18 @@ def linkAutoProcessingResult(xtal,dbDict,projectDir,xce_logfile):
     # MTZ file
     Logfile.warning('removing %s.mtz' %xtal)
     os.system('/bin/rm %s.mtz' %xtal)
-    print xtal,os.path.join('autoprocessing', visit + '-' + run + autoproc, mtzfile)
-    if os.path.isfile(os.path.join('autoprocessing', visit + '-' + run + autoproc, mtzfile)):
-        os.symlink(os.path.join('autoprocessing', visit + '-' + run + autoproc, mtzfile), xtal + '.mtz')
+    print xtal,os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, mtzfile)
+    if os.path.isfile(os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, mtzfile)):
+        os.symlink(os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, mtzfile), xtal + '.mtz')
         Logfile.insert('linking MTZ file from different auto-processing pipeline:')
-        Logfile.insert('ln -s ' + os.path.join('autoprocessing', visit + '-' + run + autoproc, mtzfile) + ' ' + xtal + '.mtz')
+        Logfile.insert('ln -s ' + os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, mtzfile) + ' ' + xtal + '.mtz')
     # LOG file
     Logfile.warning('removing %s.log'  %xtal)
     os.system('/bin/rm %s.log' %xtal)
-    if os.path.isfile(os.path.join('autoprocessing', visit + '-' + run + autoproc, logfile)):
-        os.symlink(os.path.join('autoprocessing', visit + '-' + run + autoproc, logfile), xtal + '.log')
+    if os.path.isfile(os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, logfile)):
+        os.symlink(os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, logfile), xtal + '.log')
         Logfile.insert('linking LOG file from different auto-processing pipeline:')
-        Logfile.insert('ln -s ' + os.path.join('autoprocessing', visit + '-' + run + autoproc, logfile) + ' ' + xtal + '.log')
+        Logfile.insert('ln -s ' + os.path.join('autoprocessing', visit + '-' + run + autoproc + procCode, logfile) + ' ' + xtal + '.log')
 
 
 
@@ -617,9 +622,12 @@ def detectorType():
 def NCBI_taxonomy_ID():
 
     taxonomy_dict = {   '9606':     'homo sapiens',
-                        '562':      'escherichia coli',
+                        '10090':    'mus musculus',
                         '7108':     'SPODOPTERA FRUGIPERDA',
-                        '5693 ':    'Trypanosoma cruzi' }
+                        '5693 ':    'Trypanosoma cruzi',
+                        '1508227':  'BAT SARS-LIKE CORONAVIRUS',
+                        '2697049':  'COVID-19',
+                        '562':      'escherichia coli' }
 
     return taxonomy_dict
 
@@ -653,6 +661,96 @@ def phasing_software():
                     'WARP'      ]
 
     return software
+
+
+def pdbx_keywords():
+
+    keywords = [
+        'ALLERGEN',
+        'ANTIBIOTIC',
+        'ANTIFREEZE PROTEIN',
+        'ANTIFUNGAL PROTEIN',
+        'ANTIMICROBIAL PROTEIN',
+        'ANTITOXIN',
+        'ANTITUMOR PROTEIN',
+        'ANTIVIRAL PROTEIN',
+        'APOPTOSIS',
+        'ATTRACTANT',
+        'BIOSYNTHETIC PROTEIN',
+        'BLOOD CLOTTING',
+        'CARBOHYDRATE',
+        'CELL ADHESION',
+        'CELL CYCLE',
+        'CELL INVASION',
+        'CHAPERONE',
+        'CHOLINE - BINDING PROTEIN',
+        'CIRCADIAN CLOCK PROTEIN',
+        'CONTRACTILE PROTEIN',
+        'CYTOKINE',
+        'CYTOSOLIC PROTEIN',
+        'DE NOVO PROTEIN',
+        'DNA',
+        'DNA BINDING PROTEIN',
+        'DNA - RNA HYBRID',
+        'ELECTRON TRANSPORT',
+        'ENDOCYTOSIS',
+        'EXOCYTOSIS',
+        'FLAVOPROTEIN',
+        'FLUORESCENT PROTEIN',
+        'GENE REGULATION',
+        'HORMONE',
+        'HYDROLASE',
+        'IMMUNE SYSTEM',
+        'IMMUNOSUPPRESSANT',
+        'ISOMERASE',
+        'LIGASE',
+        'LIPID BINDING PROTEIN',
+        'LIPID TRANSPORT',
+        'LUMINESCENT PROTEIN',
+        'LYASE',
+        'MEMBRANE PROTEIN',
+        'METAL BINDING PROTEIN',
+        'METAL TRANSPORT',
+        'MOTOR PROTEIN',
+        'NEUROPEPTIDE',
+        'NUCLEAR PROTEIN',
+        'ONCOPROTEIN',
+        'OXIDOREDUCTASE',
+        'OXYGEN BINDING',
+        'OXYGEN STORAGE',
+        'OXYGEN TRANSPORT',
+        'PEPTIDE BINDING PROTEIN',
+        'PHOTOSYNTHESIS',
+        'PLANT PROTEIN',
+        'PROTEIN BINDING',
+        'PROTEIN FIBRIL',
+        'PROTEIN TRANSPORT',
+        'PROTON TRANSPORT',
+        'RECOMBINATION',
+        'REPLICATION',
+        'RIBOSOMAL PROTEIN',
+        'RIBOSOME',
+        'RNA',
+        'RNA BINDING PROTEIN',
+        'SIGNALING PROTEIN',
+        'SPLICING',
+        'STRUCTURAL GENOMICS',
+        'STRUCTURAL PROTEIN',
+        'SUGAR BINDING PROTEIN',
+        'SURFACTANT PROTEIN',
+        'TOXIN',
+        'TRANSCRIPTION',
+        'TRANSFERASE',
+        'TRANSLATION',
+        'TRANSLOCASE',
+        'TRANSPORT PROTEIN',
+        'UNKNOWN FUNCTION',
+        'VIRAL PROTEIN',
+        'VIRUS',
+        'VIRUS LIKE PARTICLE'
+    ]
+
+    return keywords
 
 def html_header():
 
@@ -786,6 +884,7 @@ def html_ngl(firstPDB,firstEvent,firstMap,firstDiffMap,ligID):
     '                    useWorker: false,\n'
     '                    wrap: false,\n'
     '                    color: "purple",\n'
+    '                    isolevel: 1.0,\n'
     '                    contour: true\n'
     '                } );\n'
     '                \n'
@@ -794,7 +893,7 @@ def html_ngl(firstPDB,firstEvent,firstMap,firstDiffMap,ligID):
     '                    useWorker: false,\n'
     '                    wrap: false,\n'
     '                    color: "skyblue",\n'
-    '                    isolevel: 1.0,\n'
+    '                    isolevel: 0.9,\n'
     '                    contour: true\n'
     '                } );\n'
     '                \n'
@@ -850,6 +949,25 @@ def html_ngl(firstPDB,firstEvent,firstMap,firstDiffMap,ligID):
     '                struc.autoView("ligand and " + ligResid + " and " + ":" + ligChain)\n'
     '                stage.setFocus( 95 );\n'
     '\n'
+
+    'stage.mouseControls.remove("scroll-shift")\n'
+    '\n'
+    "stage.mouseControls.add('scroll-shift', function (stage, delta) {\n"
+    "  if (eventMap) {\n"
+    "    var d = Math.sign(delta) / 5\n"
+    "    var l = eventMap.getParameters().isolevel\n"
+    "eventMap.setParameters({ isolevel: l + d })\n"
+    " }\n"
+    "  if (fwtMap) {\n"
+    "    var d = Math.sign(delta) / 5\n"
+    "    var l = eventMap.getParameters().isolevel\n"
+    "fwtMap.setParameters({ isolevel: l + d })\n"
+    " }\n"
+    "});\n"
+    "\n"
+    'stage.mouseControls.remove("scroll-alt")\n'
+    'stage.mouseControls.add("scroll-alt", NGL.MouseActions.focusScroll);\n'
+    "\n"
     "                stage.mouseControls.add('scroll', function () {\n"
     '                    if (fwtMap) {\n'
     '                        var level2fofc = fwtMap.getParameters().isolevel.toFixed(1);\n'
@@ -980,11 +1098,11 @@ def html_download(protein_name):
 
     download = (
     '    <div class="viewport-wrapper">\n'
-    '        <h1>Human %s - XChem results</h1>\n' %protein_name +
+    '        <h1>%s - XChem results</h1>\n' %protein_name +
     "        <button id='viewer_toggle' onclick='toggleViewer()'>Viewer</button>\n"
     '        <div id="viewer_container">\n'
     '            <h2 id="data_set_id"></h2>\n'
-    '            <h3 style="color:red">Click event map in table to view a different crystal / compound pair</h3>\n'
+    '            <h3 style="color:red">Click event map in table to view a different crystal / compound pair (press SHIFT and scroll mouse wheel to change contour level of event map)</h3>\n'
     '            <div style="position:relative;margin-left:auto;margin-right:auto">\n'
     '                <div id="viewport" style="width:800px;height:600px;display:inline-block"></div>\n'
     '                <div style="display:inline-block;position:absolute;top:0;margin-left:5px">\n'

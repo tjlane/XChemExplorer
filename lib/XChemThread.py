@@ -220,7 +220,8 @@ class synchronise_db_and_filesystem(QtCore.QThread):
             db_dict['DataProcessingLOGfileName']=xtal+'.log'
             if db_dict['DataCollectionOutcome']=='None' or db_dict['DataCollectionOutcome']=='':
                 db_dict['DataCollectionOutcome']='success'
-            aimless_results=parse().read_aimless_logfile(xtal+'.log')
+#            aimless_results=parse().read_aimless_logfile(xtal+'.log')
+            aimless_results=parse().read_aimless_logfile(db_dict['DataProcessingPathToLogfile'])
             db_dict.update(aimless_results)
         else:
             db_dict['DataProcessingPathToLogfile']=''
@@ -930,6 +931,10 @@ class fit_ligands(QtCore.QThread):
         else:
             top_line = '#!' + os.getenv('SHELL') + '\n'
 
+        module = ''
+        if os.path.isdir('/dls'):
+            module = 'module load mx\n'
+
         cmd = (
             '{0!s}\n'.format(top_line)+
             '\n'
@@ -937,6 +942,7 @@ class fit_ligands(QtCore.QThread):
             '\n'
             'cd %s\n' %os.path.join(self.initial_model_directory,sampleID,'autofit_ligand') +
             '\n'
+            + module
         )
 
         return cmd
@@ -1118,264 +1124,268 @@ class merge_cif_files(QtCore.QThread):
 
 
 
-class run_dimple_on_all_autoprocessing_files(QtCore.QThread):
-    def __init__(self,sample_list,initial_model_directory,external_software,ccp4_scratch_directory,database_directory,
-                 data_source_file,max_queue_jobs,xce_logfile, remote_submission, remote_submission_string,
-                 dimple_twin_mode,pipeline):
-        QtCore.QThread.__init__(self)
-        self.sample_list=sample_list
-        self.initial_model_directory=initial_model_directory
-        self.external_software=external_software
-        self.queueing_system_available=external_software['qsub']
-        self.ccp4_scratch_directory=ccp4_scratch_directory
-        self.database_directory=database_directory
-        self.data_source_file=data_source_file
-        self.max_queue_jobs=max_queue_jobs
-        self.xce_logfile=xce_logfile
-        self.Logfile=XChemLog.updateLog(xce_logfile)
-        self.pipeline=pipeline
-        self.using_remote_qsub_submission = remote_submission
-        self.remote_qsub_submission = remote_submission_string
-        self.dimple_twin_mode = dimple_twin_mode
-
-
-    def run(self):
-        progress_step=1
-        if len(self.sample_list) != 0:
-            progress_step=100/float(len(self.sample_list))
-        progress=0
-        self.emit(QtCore.SIGNAL('update_progress_bar'), progress)
-
-        os.chdir(self.ccp4_scratch_directory)
-        os.system('/bin/rm -f xce_dimple*sh')
-
-        db=XChemDB.data_source(os.path.join(self.database_directory,self.data_source_file))
-        database=os.path.join(self.database_directory,self.data_source_file)
-
-#        print(self.sample_list)
-
-        for n,item in enumerate(self.sample_list):
-
-            xtal =                  item[0]
-            visit_run_autoproc =    item[1]
-            mtzin =                 item[2]
-            ref_pdb =               item[3]
-            ref_mtz =               item[4]
-            ref_cif =               item[5]
-
-            # check if reference mtzfile has an Rfree column; if not, then ignore
-            # DIMPLE assumes an Rfree column and barfs if it is not present
-            # note: ref_mtz looks like this: ref mtz  -R reference.mtz
-#            if os.path.isfile(ref_mtz.split()[len(ref_mtz.split())-1]):
-#                mtz_column_dict=mtztools(ref_mtz.split()[len(ref_mtz.split())-1]).get_all_columns_as_dict()
-            if os.path.isfile(ref_mtz):
-                if 'FreeR_flag' not in mtz.object(ref_mtz).column_labels():
-#                mtz_column_dict=mtztools(ref_mtz).get_all_columns_as_dict()
-#                if 'FreeR_flag' not in mtz_column_dict['RFREE']:
-                    self.Logfile.insert('cannot find FreeR_flag in reference mtz file: {0!s} -> ignoring reference mtzfile!!!'.format(ref_mtz))
-                    ref_mtz = ''
-#                    if mtz_column_dict['RFREE'] != []:
-#                        self.Logfile.insert('found Rfree set with other column name though: {0!s}'.format(str(mtz_column_dict['RFREE'])))
-#                        self.Logfile.insert('try renaming Rfree column to FreeR_flag with CAD!')
-
-#            uniqueify = ''
-#            if 'FreeR_flag' in mtz.object(mtzin).column_labels():
-#                uniqueify = 'uniqueify -f FreeR_flag ' + mtzin + ' ' + xtal + '-unique.mtz' + '\n'
+#class run_dimple_on_all_autoprocessing_files(QtCore.QThread):
+#    def __init__(self,sample_list,initial_model_directory,external_software,ccp4_scratch_directory,database_directory,
+#                 data_source_file,max_queue_jobs,xce_logfile, remote_submission, remote_submission_string,
+#                 dimple_twin_mode,pipeline):
+#        QtCore.QThread.__init__(self)
+#        self.sample_list=sample_list
+#        self.initial_model_directory=initial_model_directory
+#        self.external_software=external_software
+#        self.queueing_system_available=external_software['qsub']
+#        self.ccp4_scratch_directory=ccp4_scratch_directory
+#        self.database_directory=database_directory
+#        self.data_source_file=data_source_file
+#        self.max_queue_jobs=max_queue_jobs
+#        self.xce_logfile=xce_logfile
+#        self.Logfile=XChemLog.updateLog(xce_logfile)
+#        self.pipeline=pipeline
+#        self.using_remote_qsub_submission = remote_submission
+#        self.remote_qsub_submission = remote_submission_string
+#        self.dimple_twin_mode = dimple_twin_mode
+#
+#
+#    def run(self):
+#        progress_step=1
+#        if len(self.sample_list) != 0:
+#            progress_step=100/float(len(self.sample_list))
+#        progress=0
+#        self.emit(QtCore.SIGNAL('update_progress_bar'), progress)
+#
+#        os.chdir(self.ccp4_scratch_directory)
+#        os.system('/bin/rm -f xce_dimple*sh')
+#
+#        db=XChemDB.data_source(os.path.join(self.database_directory,self.data_source_file))
+#        database=os.path.join(self.database_directory,self.data_source_file)
+#
+##        print(self.sample_list)
+#
+#        for n,item in enumerate(self.sample_list):
+#
+#            xtal =                  item[0]
+#            visit_run_autoproc =    item[1]
+#            mtzin =                 item[2]
+#            ref_pdb =               item[3]
+#            ref_mtz =               item[4]
+#            ref_cif =               item[5]
+#
+#            # check if reference mtzfile has an Rfree column; if not, then ignore
+#            # DIMPLE assumes an Rfree column and barfs if it is not present
+#            # note: ref_mtz looks like this: ref mtz  -R reference.mtz
+##            if os.path.isfile(ref_mtz.split()[len(ref_mtz.split())-1]):
+##                mtz_column_dict=mtztools(ref_mtz.split()[len(ref_mtz.split())-1]).get_all_columns_as_dict()
+#            if os.path.isfile(ref_mtz):
+#                if 'FreeR_flag' not in mtz.object(ref_mtz).column_labels():
+##                mtz_column_dict=mtztools(ref_mtz).get_all_columns_as_dict()
+##                if 'FreeR_flag' not in mtz_column_dict['RFREE']:
+#                    self.Logfile.insert('cannot find FreeR_flag in reference mtz file: {0!s} -> ignoring reference mtzfile!!!'.format(ref_mtz))
+#                    ref_mtz = ''
+##                    if mtz_column_dict['RFREE'] != []:
+##                        self.Logfile.insert('found Rfree set with other column name though: {0!s}'.format(str(mtz_column_dict['RFREE'])))
+##                        self.Logfile.insert('try renaming Rfree column to FreeR_flag with CAD!')
+#
+##            uniqueify = ''
+##            if 'FreeR_flag' in mtz.object(mtzin).column_labels():
+##                uniqueify = 'uniqueify -f FreeR_flag ' + mtzin + ' ' + xtal + '-unique.mtz' + '\n'
+##            else:
+##                uniqueify = 'uniqueify ' + mtzin + ' ' + xtal + '-unique.mtz' + '\n'
+#
+#            db_dict= {'DimpleReferencePDB': ref_pdb}
+#            db.update_data_source(xtal,db_dict)
+#
+#            self.emit(QtCore.SIGNAL('update_status_bar(QString)'), 'creating input script for '+xtal+' in '+visit_run_autoproc)
+#
+#            if not os.path.isdir(os.path.join(self.initial_model_directory,xtal)):
+#                os.mkdir(os.path.join(self.initial_model_directory,xtal))
+#            if not os.path.isdir(os.path.join(self.initial_model_directory,xtal,'dimple')):
+#                os.mkdir(os.path.join(self.initial_model_directory,xtal,'dimple'))
+#            if not os.path.isdir(os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc)):
+#                os.mkdir(os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc))
+#            os.chdir(os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc))
+#            os.system('touch dimple_run_in_progress')
+#            os.system('/bin/rm final.mtz 2> /dev/null')
+#            os.system('/bin/rm final.pdb 2> /dev/null')
+#
+#            if self.queueing_system_available:
+#                top_line='#PBS -joe -N XCE_dimple\n'
 #            else:
-#                uniqueify = 'uniqueify ' + mtzin + ' ' + xtal + '-unique.mtz' + '\n'
-
-            db_dict= {'DimpleReferencePDB': ref_pdb}
-            db.update_data_source(xtal,db_dict)
-
-            self.emit(QtCore.SIGNAL('update_status_bar(QString)'), 'creating input script for '+xtal+' in '+visit_run_autoproc)
-
-            if not os.path.isdir(os.path.join(self.initial_model_directory,xtal)):
-                os.mkdir(os.path.join(self.initial_model_directory,xtal))
-            if not os.path.isdir(os.path.join(self.initial_model_directory,xtal,'dimple')):
-                os.mkdir(os.path.join(self.initial_model_directory,xtal,'dimple'))
-            if not os.path.isdir(os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc)):
-                os.mkdir(os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc))
-            os.chdir(os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc))
-            os.system('touch dimple_run_in_progress')
-            os.system('/bin/rm final.mtz 2> /dev/null')
-            os.system('/bin/rm final.pdb 2> /dev/null')
-
-            if self.queueing_system_available:
-                top_line='#PBS -joe -N XCE_dimple\n'
-            else:
-                top_line='#!'+os.getenv('SHELL')+'\n'
-
-            if 'csh' in os.getenv('SHELL'):
-                ccp4_scratch='setenv CCP4_SCR '+self.ccp4_scratch_directory+'\n'
-            elif 'bash' in os.getenv('SHELL'):
-                ccp4_scratch='export CCP4_SCR='+self.ccp4_scratch_directory+'\n'
-            else:
-                ccp4_scratch=''
-
-            if 'dimple_rerun_on_selected_file' in visit_run_autoproc:
-                additional_cmds = (
-                            'cd {0!s}\n'.format(os.path.join(self.initial_model_directory,xtal)) +
-                            '/bin/rm dimple.pdb\n'
-                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/final.pdb dimple.pdb\n'
-                            '/bin/rm dimple.mtz\n'
-                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/final.mtz dimple.mtz\n'
-                            '/bin/rm 2fofc.map\n'
-                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/2fofc.map .\n'
-                            '/bin/rm fofc.map\n'
-                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/fofc.map .\n'
-                            '\n'
-                            '$CCP4/bin/ccp4-python '+os.path.join(os.getenv('XChemExplorer_DIR'),'helpers','update_data_source_for_new_dimple_pdb.py')+
-                            ' {0!s} {1!s} {2!s}\n'.format(os.path.join(self.database_directory,self.data_source_file), xtal, self.initial_model_directory)  )
-
-            else:
-                additional_cmds=''
-
-#            resolution_high = 0.1
-#            o = iotbx.mtz.object(mtzin)
-#            low, high = o.max_min_resolution()
-            hkl = any_reflection_file(file_name=mtzin)
-            miller_arrays = hkl.as_miller_arrays()
-            mtzFile = miller_arrays[0]
-
-            if mtzFile.space_group_info().symbol_and_number() ==  'R 3 :H (No. 146)':
-                symNoAbsence = 'H3'
-            else:
-                symNoAbsence = str([x[0] for x in str(mtzFile.space_group_info().symbol_and_number().split('(')[0]).split()]).replace('[','').replace(']','').replace("'","").replace(',','').replace(' ','')
-
-            dls_stuff = ''
-            if os.path.isdir('/dls'):
-                dls_stuff = (
-                    'module unload ccp4\n'
-                    'source /dls/science/groups/i04-1/software/pandda_0.2.12/ccp4/ccp4-7.0/bin/ccp4.setup-sh\n'
-                )
-
-            twin = ''
-            if self.dimple_twin_mode:
-                twin = "--refmac-key 'TWIN'"
-
-            Cmds = (
-                    '{0!s}\n'.format(top_line)+
-                    '\n'
-                    'export XChemExplorer_DIR="'+os.getenv('XChemExplorer_DIR')+'"\n'
-                    '\n'
-                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc) +
-                    '\n'
-                    'source $XChemExplorer_DIR/setup-scripts/xce.setup-sh\n'
-                    '\n'
-                    + dls_stuff +
-                    '\n'
-                    + ccp4_scratch +
-                    '\n'
-                    '$CCP4/bin/ccp4-python $XChemExplorer_DIR/helpers/update_status_flag.py %s %s %s %s\n' %(database,xtal,'DimpleStatus','running') +
-                    '\n'
-                    'unique hklout unique.mtz << eof\n'
-                    ' cell %s\n' %str([round(float(i),2) for i in mtzFile.unit_cell().parameters()]).replace('[','').replace(']','')+
-                    ' symmetry %s\n' %symNoAbsence+
-                    ' resolution %s\n' %str(round(float(mtzFile.d_min()),3))+
-                    'eof\n'
-                    '\n'
-#                    'freerflag hklin unique.mtz hklout free.mtz > freerflag.log\n'
-                    '\n'
-                    'sftools << eof > sftools.log\n'
-                    ' read unique.mtz\n'
-                    ' calc col F = 10.0\n'
-                    ' calc col SIGF = 1.0\n'
-                    ' write sftools.mtz\n'
-                    'eof\n'
-                    '\n'
-                    'cad hklin1 sftools.mtz hklin2 %s hklout %s.999A.mtz << eof\n' %(mtzin,xtal) +
-                    ' monitor BRIEF\n'
-                    ' labin file 1 E1=F E2=SIGF\n'
-                    ' labout file 1 E1=F_unique E2=SIGF_unique\n'
-                    ' labin file 2 ALL\n'
-                    ' resolution file 1 999.0 %s\n' %str(round(float(mtzFile.d_min()),2))+
-                    'eof\n'
-                    '\n'
-                    "dimple --no-cleanup %s.999A.mtz %s %s %s %s dimple\n" %(xtal,ref_pdb,ref_mtz,ref_cif,twin) +
-                    '\n'
-                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc,'dimple') +
-#                    + uniqueify +
+#                top_line='#!'+os.getenv('SHELL')+'\n'
+#
+#            if 'csh' in os.getenv('SHELL'):
+#                ccp4_scratch='setenv CCP4_SCR '+self.ccp4_scratch_directory+'\n'
+#            elif 'bash' in os.getenv('SHELL'):
+#                ccp4_scratch='export CCP4_SCR='+self.ccp4_scratch_directory+'\n'
+#            else:
+#                ccp4_scratch=''
+#
+#            if 'dimple_rerun_on_selected_file' in visit_run_autoproc:
+#                additional_cmds = (
+#                            'cd {0!s}\n'.format(os.path.join(self.initial_model_directory,xtal)) +
+#                            '/bin/rm dimple.pdb\n'
+#                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/final.pdb dimple.pdb\n'
+#                            '/bin/rm dimple.mtz\n'
+#                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/final.mtz dimple.mtz\n'
+#                            '/bin/rm 2fofc.map\n'
+#                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/2fofc.map .\n'
+#                            '/bin/rm fofc.map\n'
+#                            'ln -s dimple/dimple_rerun_on_selected_file/dimple/fofc.map .\n'
+#                            '\n'
+#                            '$CCP4/bin/ccp4-python '+os.path.join(os.getenv('XChemExplorer_DIR'),'helpers','update_data_source_for_new_dimple_pdb.py')+
+#                            ' {0!s} {1!s} {2!s}\n'.format(os.path.join(self.database_directory,self.data_source_file), xtal, self.initial_model_directory)  )
+#
+#            else:
+#                additional_cmds=''
+#
+##            resolution_high = 0.1
+##            o = iotbx.mtz.object(mtzin)
+##            low, high = o.max_min_resolution()
+#            hkl = any_reflection_file(file_name=mtzin)
+#            miller_arrays = hkl.as_miller_arrays()
+#            mtzFile = miller_arrays[0]
+#
+#            if mtzFile.space_group_info().symbol_and_number() ==  'R 3 :H (No. 146)':
+#                symNoAbsence = 'H3'
+#            elif mtzFile.space_group_info().symbol_and_number() == 'R 3 2 :H (No. 155)':
+#                symNoAbsence = 'H32'
+#            else:
+#                symNoAbsence = str([x[0] for x in str(mtzFile.space_group_info().symbol_and_number().split('(')[0]).split()]).replace('[','').replace(']','').replace("'","").replace(',','').replace(' ','')
+#            if symNoAbsence.replace(' ','') == "R32:":
+#                symNoAbsence = 'H32'
+#
+#            dls_stuff = ''
+#            if os.path.isdir('/dls'):
+#                dls_stuff = (
+#                    'module unload ccp4\n'
+#                    'source /dls/science/groups/i04-1/software/pandda_0.2.12/ccp4/ccp4-7.0/bin/ccp4.setup-sh\n'
+#                )
+#
+#            twin = ''
+#            if self.dimple_twin_mode:
+#                twin = "--refmac-key 'TWIN'"
+#
+#            Cmds = (
+#                    '{0!s}\n'.format(top_line)+
 #                    '\n'
-#                    'cad hklin1 %s hklout %s <<eof\n' %(str(xtal + '-unique.mtz'), str(xtal + '-unique-2.mtz')) +
-#                    'monitor BRIEF\n'
-#                    'labin file 1 -\n' 
-#                    '    ALL\n'
-#                    'resolution file 1 999.0 %s\n' %(high) +
+#                    'export XChemExplorer_DIR="'+os.getenv('XChemExplorer_DIR')+'"\n'
+#                    '\n'
+#                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc) +
+#                    '\n'
+#                    'source $XChemExplorer_DIR/setup-scripts/xce.setup-sh\n'
+#                    '\n'
+#                    + dls_stuff +
+#                    '\n'
+#                    + ccp4_scratch +
+#                    '\n'
+#                    '$CCP4/bin/ccp4-python $XChemExplorer_DIR/helpers/update_status_flag.py %s %s %s %s\n' %(database,xtal,'DimpleStatus','running') +
+#                    '\n'
+#                    'unique hklout unique.mtz << eof\n'
+#                    ' cell %s\n' %str([round(float(i),2) for i in mtzFile.unit_cell().parameters()]).replace('[','').replace(']','')+
+#                    ' symmetry %s\n' %symNoAbsence+
+#                    ' resolution %s\n' %str(round(float(mtzFile.d_min()),3))+
 #                    'eof\n'
-#                    'dimple --no-cleanup %s-unique-2.mtz %s %s %s dimple\n' %(xtal,ref_pdb,ref_mtz,ref_cif) +
+#                    '\n'
+##                    'freerflag hklin unique.mtz hklout free.mtz > freerflag.log\n'
+#                    '\n'
+#                    'sftools << eof > sftools.log\n'
+#                    ' read unique.mtz\n'
+#                    ' calc col F = 10.0\n'
+#                    ' calc col SIGF = 1.0\n'
+#                    ' write sftools.mtz\n'
+#                    'eof\n'
+#                    '\n'
+#                    'cad hklin1 sftools.mtz hklin2 %s hklout %s.999A.mtz << eof\n' %(mtzin,xtal) +
+#                    ' monitor BRIEF\n'
+#                    ' labin file 1 E1=F E2=SIGF\n'
+#                    ' labout file 1 E1=F_unique E2=SIGF_unique\n'
+#                    ' labin file 2 ALL\n'
+#                    ' resolution file 1 999.0 %s\n' %str(round(float(mtzFile.d_min()),2))+
+#                    'eof\n'
+#                    '\n'
+#                    "dimple --no-cleanup %s.999A.mtz %s %s %s %s dimple\n" %(xtal,ref_pdb,ref_mtz,ref_cif,twin) +
 #                    '\n'
 #                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc,'dimple') +
-                    '\n'
-                    'fft hklin final.mtz mapout 2fofc.map << EOF\n'
-                    ' labin F1=FWT PHI=PHWT\n'
-                    'EOF\n'
-                    '\n'
-                    'fft hklin final.mtz mapout fofc.map << EOF\n'
-                    ' labin F1=DELFWT PHI=PHDELWT\n'
-                    'EOF\n'
-                    '\n'
-                    +additional_cmds+
-                    '\n'
-                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc) +
-                    '\n'
-                    '/bin/rm dimple_run_in_progress\n'
-                    '\n'
-                    'ln -s dimple/final.pdb .\n'
-                    'ln -s dimple/final.mtz .\n'
-                    )
-
-            # print(Cmds)
-
-            os.chdir(self.ccp4_scratch_directory)
-            f = open('xce_dimple_{0!s}.sh'.format(str(n+1)),'w')
-            f.write(Cmds)
-            f.close()
-            os.system('chmod +x xce_dimple_{0!s}.sh'.format(str(n+1)))
-            db_dict= {'DimpleStatus': 'started'}
-            self.Logfile.insert('{0!s}: setting DataProcessingStatus flag to started'.format(xtal))
-            db.update_data_source(xtal,db_dict)
-
-
-            progress += progress_step
-            self.emit(QtCore.SIGNAL('update_progress_bar'), progress)
-
-        # submit job
-        self.Logfile.insert('created input scripts for '+str(n+1)+' in '+self.ccp4_scratch_directory)
-        os.chdir(self.ccp4_scratch_directory)
-        if os.path.isdir('/dls'):
-            if self.external_software['qsub_array']:
-                Cmds = (
-                        '#PBS -joe -N xce_dimple_master\n'
-                        './xce_dimple_$SGE_TASK_ID.sh\n'
-                        )
-                f = open('dimple_master.sh','w')
-                f.write(Cmds)
-                f.close()
-                print(os.getcwd())
-                self.Logfile.insert('submitting array job with maximal 100 jobs running on cluster')
-                self.Logfile.insert('using the following command:')
-                self.Logfile.insert('qsub -P labxchem -q medium.q -t 1:{0!s} -tc {1!s} dimple_master.sh'.format(str(n+1), self.max_queue_jobs))
-                if self.using_remote_qsub_submission:
-                    os.system(str(self.remote_qsub_submission).replace("qsub'", str('cd ' + str(os.getcwd()) + '; ' + 'qsub -P labxchem -q medium.q -t 1:{0!s} -tc {1!s} dimple_master.sh'
-                                                                  .format(str(n+1), self.max_queue_jobs))) + "'")
-
-                else:
-                    os.system('qsub -P labxchem -t 1:{0!s} -tc {1!s} -N dimple-master dimple_master.sh'.format(str(n+1), self.max_queue_jobs))
-            else:
-                self.Logfile.insert("cannot start ARRAY job: make sure that 'module load global/cluster' is in your .bashrc or .cshrc file")
-        elif self.external_software['qsub']:
-            self.Logfile.insert('submitting {0!s} individual jobs to cluster'.format((str(n+1))))
-            self.Logfile.insert('WARNING: this could potentially lead to a crash...')
-            for i in range(n+1):
-                self.Logfile.insert('qsub -q medium.q -N dimple xce_dimple_{0!s}.sh'.format((str(i+1))))
-                os.system('qsub -N dimple xce_dimple_{0!s}.sh'.format((str(i+1))))
-        else:
-            self.Logfile.insert('running %s consecutive DIMPLE jobs on your local machine')
-            for i in range(n+1):
-                self.Logfile.insert('starting xce_dimple_{0!s}.sh'.format((str(i+1))))
-                os.system('./xce_dimple_{0!s}.sh'.format((str(i+1))))
-
-        self.emit(QtCore.SIGNAL('datasource_menu_reload_samples'))
+##                    + uniqueify +
+##                    '\n'
+##                    'cad hklin1 %s hklout %s <<eof\n' %(str(xtal + '-unique.mtz'), str(xtal + '-unique-2.mtz')) +
+##                    'monitor BRIEF\n'
+##                    'labin file 1 -\n'
+##                    '    ALL\n'
+##                    'resolution file 1 999.0 %s\n' %(high) +
+##                    'eof\n'
+##                    'dimple --no-cleanup %s-unique-2.mtz %s %s %s dimple\n' %(xtal,ref_pdb,ref_mtz,ref_cif) +
+##                    '\n'
+##                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc,'dimple') +
+#                    '\n'
+#                    'fft hklin final.mtz mapout 2fofc.map << EOF\n'
+#                    ' labin F1=FWT PHI=PHWT\n'
+#                    'EOF\n'
+#                    '\n'
+#                    'fft hklin final.mtz mapout fofc.map << EOF\n'
+#                    ' labin F1=DELFWT PHI=PHDELWT\n'
+#                    'EOF\n'
+#                    '\n'
+#                    +additional_cmds+
+#                    '\n'
+#                    'cd %s\n' %os.path.join(self.initial_model_directory,xtal,'dimple',visit_run_autoproc) +
+#                    '\n'
+#                    '/bin/rm dimple_run_in_progress\n'
+#                    '\n'
+#                    'ln -s dimple/final.pdb .\n'
+#                    'ln -s dimple/final.mtz .\n'
+#                    )
+#
+#            # print(Cmds)
+#
+#            os.chdir(self.ccp4_scratch_directory)
+#            f = open('xce_dimple_{0!s}.sh'.format(str(n+1)),'w')
+#            f.write(Cmds)
+#            f.close()
+#            os.system('chmod +x xce_dimple_{0!s}.sh'.format(str(n+1)))
+#            db_dict= {'DimpleStatus': 'started'}
+#            self.Logfile.insert('{0!s}: setting DataProcessingStatus flag to started'.format(xtal))
+#            db.update_data_source(xtal,db_dict)
+#
+#
+#            progress += progress_step
+#            self.emit(QtCore.SIGNAL('update_progress_bar'), progress)
+#
+#        # submit job
+#        self.Logfile.insert('created input scripts for '+str(n+1)+' in '+self.ccp4_scratch_directory)
+#        os.chdir(self.ccp4_scratch_directory)
+#        if os.path.isdir('/dls'):
+#            if self.external_software['qsub_array']:
+#                Cmds = (
+#                        '#PBS -joe -N xce_dimple_master\n'
+#                        './xce_dimple_$SGE_TASK_ID.sh\n'
+#                        )
+#                f = open('dimple_master.sh','w')
+#                f.write(Cmds)
+#                f.close()
+#                print(os.getcwd())
+#                self.Logfile.insert('submitting array job with maximal 100 jobs running on cluster')
+#                self.Logfile.insert('using the following command:')
+#                self.Logfile.insert('qsub -P labxchem -q medium.q -t 1:{0!s} -tc {1!s} dimple_master.sh'.format(str(n+1), self.max_queue_jobs))
+#                if self.using_remote_qsub_submission:
+#                    os.system(str(self.remote_qsub_submission).replace("qsub'", str('cd ' + str(os.getcwd()) + '; ' + 'qsub -P labxchem -q medium.q -t 1:{0!s} -tc {1!s} dimple_master.sh'
+#                                                                  .format(str(n+1), self.max_queue_jobs))) + "'")
+#
+#                else:
+#                    os.system('qsub -P labxchem -t 1:{0!s} -tc {1!s} -N dimple-master dimple_master.sh'.format(str(n+1), self.max_queue_jobs))
+#            else:
+#                self.Logfile.insert("cannot start ARRAY job: make sure that 'module load global/cluster' is in your .bashrc or .cshrc file")
+#        elif self.external_software['qsub']:
+#            self.Logfile.insert('submitting {0!s} individual jobs to cluster'.format((str(n+1))))
+#            self.Logfile.insert('WARNING: this could potentially lead to a crash...')
+#            for i in range(n+1):
+#                self.Logfile.insert('qsub -q medium.q -N dimple xce_dimple_{0!s}.sh'.format((str(i+1))))
+#                os.system('qsub -N dimple xce_dimple_{0!s}.sh'.format((str(i+1))))
+#        else:
+#            self.Logfile.insert('running %s consecutive DIMPLE jobs on your local machine')
+#            for i in range(n+1):
+#                self.Logfile.insert('starting xce_dimple_{0!s}.sh'.format((str(i+1))))
+#                os.system('./xce_dimple_{0!s}.sh'.format((str(i+1))))
+#
+#        self.emit(QtCore.SIGNAL('datasource_menu_reload_samples'))
 
 class run_dimple_on_all_autoprocessing_files_new(QtCore.QThread):
     def __init__(self,sample_list,initial_model_directory,external_software,ccp4_scratch_directory,database_directory,
@@ -1716,6 +1726,8 @@ class run_dimple_on_all_autoprocessing_files_new(QtCore.QThread):
 
         if mtzFile.space_group_info().symbol_and_number() ==  'R 3 :H (No. 146)':
             symNoAbsence = 'H3'
+        elif mtzFile.space_group_info().symbol_and_number() == 'R 3 2 :H (No. 155)':
+            symNoAbsence = 'H32'
         else:
             symNoAbsence = str([x[0] for x in str(mtzFile.space_group_info().symbol_and_number().split('(')[0]).split()]).replace('[','').replace(']','').replace("'","").replace(',','').replace(' ','')
 
@@ -1761,7 +1773,9 @@ class run_dimple_on_all_autoprocessing_files_new(QtCore.QThread):
                 ' resolution file 1 999.0 %s\n' %str(round(float(mtzFile.d_min()),2))+
                 'eof\n'
                 '\n'
-                "dimple --no-cleanup %s.999A.mtz %s %s %s %s dimple\n" % (xtal, ref_pdb, ref_mtz, ref_cif, twin) +
+                'pointless hklin %s.999A.mtz hklout %s.999A.reind.mtz xyzin %s > pointless.reind.log\n' %(xtal,xtal,ref_pdb) +
+                '\n'
+                "dimple --no-cleanup %s.999A.reind.mtz %s %s %s %s dimple\n" % (xtal, ref_pdb, ref_mtz, ref_cif, twin) +
                 '\n'
                 'fft hklin dimple/final.mtz mapout 2fofc.map << EOF\n'
                 ' labin F1=FWT PHI=PHWT\n'
@@ -2223,8 +2237,12 @@ class choose_autoprocessing_outcome(QtCore.QThread):
     def run(self):
         for sample in sorted(self.allSamples):
             if self.db.autoprocessing_result_user_assigned(sample) and not self.rescore:
-                self.Logfile.warning('{0!s}: user has manually selected auto-processing result; will NOT auto-select!'.format(sample))
-                continue
+                if os.path.isfile(os.path.join(self.projectDir,sample,sample+'.mtz')):
+                    self.Logfile.warning('{0!s}: user has manually selected auto-processing result; will NOT auto-select!'.format(sample))
+                    continue
+                else:
+                    self.Logfile.warning('{0!s}: user has manually selected auto-processing result before, but {1!s}.mtz does not exist'.format(sample,sample))
+                    self.Logfile.insert('%s: selecting autoprocessing result' % sample)
             elif self.rescore:
                 self.Logfile.warning('{0!s}: rescore selected -> might overwrite user selection!'.format(sample))
             else:
@@ -2284,6 +2302,8 @@ class choose_autoprocessing_outcome(QtCore.QThread):
                     self.Logfile.insert('checking unit cell volume difference and point group:')
                     for reference_file in self.reference_file_list:
                         if not reference_file[4]==0:
+                            self.Logfile.insert('unitcell volume reference:' + str(reference_file[4]))
+                            self.Logfile.insert('unitcell volume dataset:  ' + str(resultDict['DataProcessingUnitCellVolume']))
                             unitcell_difference=round((math.fabs(reference_file[4]-float(resultDict['DataProcessingUnitCellVolume']))/reference_file[4])*100,1)
                             self.Logfile.insert(resultDict['DataProcessingProgram'] + ': ' +
                                                 str(unitcell_difference) + '% difference -> pg(ref): ' +
@@ -2341,16 +2361,17 @@ class choose_autoprocessing_outcome(QtCore.QThread):
 
     def selectSpecificPipelineOnly(self,dbList):
         tmp = []
+        self.Logfile.insert('selecting datasets by auto-processing pipeline: ' + self.selection_mechanism)
         for resultDict in dbList:
             if self.selection_mechanism == 'dials - only' and 'dials' in resultDict['DataProcessingProgram']:
                 tmp.append(resultDict)
-            if self.selection_mechanism == 'xia2 3d - only' and '3d-run' in resultDict['DataProcessingProgram']:
+            if self.selection_mechanism == 'xia2 3d - only' and '3d-' in resultDict['DataProcessingProgram']:
                 tmp.append(resultDict)
-            if self.selection_mechanism == 'xia2 3dii - only' and '3dii-run' in resultDict['DataProcessingProgram']:
+            if self.selection_mechanism == 'xia2 3dii - only' and '3dii' in resultDict['DataProcessingProgram']:
                 tmp.append(resultDict)
-            if self.selection_mechanism == 'autoProc - only' and resultDict['DataProcessingProgram'] == 'autoPROC':
+            if self.selection_mechanism == 'autoProc - only' and 'autoPROC' in resultDict['DataProcessingProgram'] and not 'staraniso' in resultDict['DataProcessingProgram']:
                 tmp.append(resultDict)
-            if self.selection_mechanism == 'autoProc_staraniso - only' and resultDict['DataProcessingProgram'] == 'aP_staraniso':
+            if self.selection_mechanism == 'autoProc_staraniso - only' and 'autoPROC' in resultDict['DataProcessingProgram'] and 'staraniso' in resultDict['DataProcessingProgram']:
                 tmp.append(resultDict)
         if not tmp:
             tmp = dbList
@@ -2420,8 +2441,11 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
         self.exisitingSamples = self.getExistingSamples()
 
         self.toParse = [
-                [   os.path.join('xia2', '*'),
+                [   os.path.join('*'),
                     os.path.join('LogFiles', '*aimless.log'),
+                    os.path.join('DataFiles', '*free.mtz')],
+                [   os.path.join('*'),
+                    os.path.join('LogFiles', '*merging-statistics.json'),
                     os.path.join('DataFiles', '*free.mtz')],
                 [   os.path.join('multi-xia2', '*'),
                     os.path.join('LogFiles', '*aimless.log'),
@@ -2438,10 +2462,53 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
                 [   os.path.join('autoPROC'),
                     '*summary.tar.gz',                  # staraniso_alldata-unique.table1 only available in tar archive
                     '*staraniso_alldata-unique.mtz'],
+                [   os.path.join('autoPROC-*'),
+                    '*aimless.log',
+                    '*truncate-unique.mtz'],
+                [   os.path.join('autoPROC-*'),
+                    '*summary.tar.gz',
+                    '*staraniso_alldata-unique.mtz'],
                 [   os.path.join('*'),
                     os.path.join('LogFiles', '*aimless.log'),
                     os.path.join('DataFiles', '*free.mtz')]
                         ]
+
+#        self.toParse = [
+#                [   os.path.join('xia2', '*'),
+#                    os.path.join('LogFiles', '*aimless.log'),
+#                    os.path.join('DataFiles', '*free.mtz')],
+#                [   os.path.join('xia2-3*'),
+#                    os.path.join('LogFiles', '*aimless.log'),
+#                    os.path.join('DataFiles', '*free.mtz')],
+#                [   os.path.join('xia2-dials*'),
+#                    os.path.join('LogFiles', '*merging-statistics.json'),
+#                    os.path.join('DataFiles', '*free.mtz')],
+#                [   os.path.join('multi-xia2', '*'),
+#                    os.path.join('LogFiles', '*aimless.log'),
+#                    os.path.join('DataFiles', '*free.mtz')],
+#                [   os.path.join('autoPROC', '*'),
+#                    '*aimless.log',
+#                    '*truncate-unique.mtz'],
+#                [   os.path.join('autoPROC', '*'),
+#                    '*staraniso_alldata-unique.table1',
+#                    '*staraniso_alldata-unique.mtz'],
+#                [   os.path.join('autoPROC'),
+#                    '*aimless.log',
+#                    '*truncate-unique.mtz'],
+#                [   os.path.join('autoPROC'),
+#                    '*summary.tar.gz',                  # staraniso_alldata-unique.table1 only available in tar archive
+#                    '*staraniso_alldata-unique.mtz'],
+#                [   os.path.join('autoPROC-*'),
+#                    '*aimless.log',
+#                    '*truncate-unique.mtz'],
+#                [   os.path.join('autoPROC-*'),
+#                    '*summary.tar.gz',
+#                    '*staraniso_alldata-unique.mtz'],
+#                [   os.path.join('*'),
+#                    os.path.join('LogFiles', '*aimless.log'),
+#                    os.path.join('DataFiles', '*free.mtz')]
+#                        ]
+
 
     def run(self):
         if self.agamemnon:
@@ -2464,35 +2531,49 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
         if not os.path.isdir(os.path.join(self.projectDir,xtal)):
             os.mkdir(os.path.join(self.projectDir,xtal))
 
-    def createAutoprocessingDir(self,xtal,run,autoproc):
+    def createAutoprocessingDir(self,xtal,run,autoproc,proc_code):
         # create all the directories if necessary
+        self.Logfile.insert('%s: checking if new directory needs to be created for %s' %(xtal,os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc + '_' + proc_code)))
         if not os.path.isdir(os.path.join(self.projectDir,xtal,'autoprocessing')):
             os.mkdir(os.path.join(self.projectDir,xtal,'autoprocessing'))
         if not os.path.isdir(
-                os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc)):
-            os.mkdir(os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc))
+                os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code)):
+            self.Logfile.insert('%s: making directory %s' %(xtal,os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code)))
+            os.mkdir(os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code))
+        else:
+            self.Logfile.warning('%s: directory exists; skipping...' %xtal)
 
-    def cleanUpDir(self,xtal,run,autoproc,mtzfile,logfile):
+    def cleanUpDir(self,xtal,run,autoproc,mtzfile,logfile,proc_code):
         toKeep = ['staraniso_alldata-unique.mtz','staraniso_alldata-unique.table1',
                   'staraniso_alldata.log',xtal+'.mtz',xtal+'.log']
-        os.chdir(os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc))
+        os.chdir(os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code))
         for files in glob.glob('*'):
             if files not in toKeep:
                 os.system('/bin/rm -f ' + files)
 
 
-    def copyMTZandLOGfiles(self,xtal,run,autoproc,mtzfile,logfile):
+    def copyMTZandLOGfiles(self,xtal,run,autoproc,mtzfile,logfile,proc_code):
         mtzNew = ''
         logNew = ''
-        os.chdir(os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc))
+        os.chdir(os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code))
         # MTZ file
         if not os.path.isfile(mtzfile[mtzfile.rfind('/') + 1:]):
             self.Logfile.insert('%s: copying %s' % (xtal, mtzfile))
             os.system('/bin/cp ' + mtzfile + ' .')
+            for mmcif in glob.glob(os.path.join(mtzfile[:mtzfile.rfind('/')],'*')):
+                if mmcif.endswith('.mmcif'):
+                    self.Logfile.insert('%s: copying %s' %(xtal,mmcif))
+                    os.system('/bin/cp ' + mmcif + ' .')
         if os.path.isfile(mtzfile[mtzfile.rfind('/')+1:]) and not os.path.isfile(xtal+'.mtz'):
             os.symlink(mtzfile[mtzfile.rfind('/')+1:], xtal + '.mtz')
         if os.path.isfile(mtzfile[mtzfile.rfind('/') + 1:]):
-            mtzNew=os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc, mtzfile[mtzfile.rfind('/')+1:])
+            mtzNew=os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code, mtzfile[mtzfile.rfind('/')+1:])
+        # MTZ file unmerged
+        if os.path.isfile(mtzfile.replace('_free.mtz','_scaled_unmerged.mtz')):
+            self.Logfile.insert('%s: found unmerged mtz file' %xtal)
+            if not os.path.isfile(xtal+'_unmerged.mtz'):
+                self.Logfile.insert('%s: copying %s' %(xtal,mtzfile.replace('_free.mtz','_scaled_unmerged.mtz')))
+                os.system('/bin/cp ' + mtzfile.replace('_free.mtz','_scaled_unmerged.mtz') + ' .')
         # AIMLESS logfile
         if not os.path.isfile(logfile[logfile.rfind('/')+1:]):
             self.Logfile.insert('%s: copying %s' % (xtal, logfile))
@@ -2501,11 +2582,11 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
                 self.Logfile.insert('unpacking summary.tar.gz')
                 os.system('tar -xzvf summary.tar.gz')
                 logfile = logfile.replace('summary.tar.gz','staraniso_alldata-unique.table1')
-                self.cleanUpDir(xtal,run,autoproc,mtzfile,logfile)
+                self.cleanUpDir(xtal,run,autoproc,mtzfile,logfile,proc_code)
         if os.path.isfile(logfile[logfile.rfind('/')+1:]) and not os.path.isfile(xtal+'.log'):
             os.symlink(logfile[logfile.rfind('/')+1:], xtal + '.log')
         if os.path.isfile(logfile[logfile.rfind('/') + 1:]):
-            logNew=os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc, logfile[logfile.rfind('/') + 1:])
+            logNew=os.path.join(self.projectDir,xtal,'autoprocessing', self.visit + '-' + run + autoproc+ '_' + proc_code, logfile[logfile.rfind('/') + 1:])
         return mtzNew,logNew
 
     def makeJPGdir(self,xtal,run):
@@ -2527,7 +2608,7 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
             for img in glob.glob(os.path.join(self.processedDir.replace(proposal,self.visit),'jpegs',auto,self.target,xtal,run + '*.0.png')):
                 if not os.path.isfile(os.path.join(self.projectDir,xtal,'jpg', self.visit +'-'+ run,img[img.rfind('/')+1:])):
                     self.Logfile.insert('%s: copying %s' % (xtal, img))
-                    os.system('/bin/cp %s %s' %(img,os.path.join(self.projectDir,xtal,'jpg', self.visit + '-' + run)))
+                    os.system('/bin/cp %s %s' %(img,os.path.join(self.projectDir,xtal,'jpg', self.visit + '-' + auto+'_'+ run)))
         else:
             for img in glob.glob(os.path.join(self.processedDir.replace('processed', 'jpegs'), run + '*.0.png')):
                 found = True
@@ -2550,12 +2631,16 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
         return jpgDict
 
 
-    def readProcessingUpdateResults(self,xtal,folder,log,mtz,timestamp,current_run,autoproc):
+    def readProcessingUpdateResults(self,xtal,folder,log,mtz,timestamp,current_run,autoproc,proc_code):
         db_dict = {}
+        self.Logfile.warning('%s: looking for %s' %(xtal,os.path.join(folder, mtz)))
         for mtzfile in glob.glob(os.path.join(folder,mtz)):
+            self.Logfile.insert('%s: found %s' %(xtal,mtzfile))
+            self.Logfile.warning('%s: looking for %s' %(xtal,os.path.join(folder, log)))
             for logfile in glob.glob(os.path.join(folder, log)):
-                self.createAutoprocessingDir(xtal, current_run, autoproc)
-                mtzNew,logNew = self.copyMTZandLOGfiles(xtal,current_run,autoproc,mtzfile,logfile)
+                self.Logfile.insert('%s: found %s' % (xtal, logfile))
+                self.createAutoprocessingDir(xtal, current_run, autoproc,proc_code)
+                mtzNew,logNew = self.copyMTZandLOGfiles(xtal,current_run,autoproc,mtzfile,logfile,proc_code)
                 if self.target == '=== project directory ===':
                     target = 'unknown'
                 else:
@@ -2569,21 +2654,33 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
                 db_dict.update(parse().read_aimless_logfile(logNew))
                 db_dict.update(self.findJPGs(xtal,current_run))     # image exist even if data processing failed
                 db_dict['DataCollectionBeamline'] = self.beamline
-                self.update_data_collection_table(xtal,current_run,autoproc,db_dict)
+                self.update_data_collection_table(xtal,current_run,autoproc,db_dict,proc_code)
 #        return db_dict
 
-    def getAutoProc(self,folder):
-        autoproc='unkown'
+    def getAutoProc(self,folder,staraniso):
+        self.Logfile.insert('checking name of auto-processing pipeline...')
+        autoproc='unknown'
         if 'ap-run' in folder:
             autoproc = 'autoPROC'
         else:
-            autoproc = folder.split('/')[len(folder.split('/'))-1]
+            for f in folder.split('/'):
+                if 'autoPROC' in f:
+                    autoproc = f + staraniso
+                    break
+                elif 'xia2' in f:
+                    autoproc = f
+                    break
+                elif 'dials' in f:
+                    autoproc = f
+                    break
+        self.Logfile.insert('name of auto-processing pipeline: %s' %autoproc)
         return autoproc
 
-    def update_data_collection_table(self,xtal,current_run,autoproc,db_dict):
+    def update_data_collection_table(self,xtal,current_run,autoproc,db_dict,proc_code):
         condition_dict = {  'CrystalName':              xtal,
                             'DataCollectionVisit':      self.visit,
                             'DataCollectionRun':        current_run,
+                            'DataCollectionSubdir':     proc_code,
                             'DataProcessingProgram':    autoproc    }
         self.db.update_insert_any_table('collectionTable', db_dict, condition_dict)
 
@@ -2650,33 +2747,40 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
 
             for run in sorted(glob.glob(runDir)):
                 current_run=run[run.rfind('/')+1:]
-                if current_run in runList:
-                    continue
-                self.Logfile.insert('%s -> run: %s -> current run: %s' %(xtal,run,current_run))
-                timestamp=datetime.fromtimestamp(os.path.getmtime(run)).strftime('%Y-%m-%d %H:%M:%S')
+                for code in glob.glob(os.path.join(run,'*')):
+                    proc_code = code[code.rfind('/')+1:]
+                    if current_run+proc_code in runList:
+                        continue
+                    self.Logfile.insert('%s -> run: %s -> current run: %s -> %s' %(xtal,run,current_run,proc_code))
+                    timestamp=datetime.fromtimestamp(os.path.getmtime(run)).strftime('%Y-%m-%d %H:%M:%S')
+                    # create directory for crystal aligment images in projectDir
+                    self.makeJPGdir(xtal,current_run)
+                    self.copyJPGs(xtal, current_run, 'non-auto')    # 'non-auto' is irrelevant here
 
-                # create directory for crystal aligment images in projectDir
-                self.makeJPGdir(xtal,current_run)
-                self.copyJPGs(xtal, current_run, 'non-auto')    # 'non-auto' is irrelevant here
 
-                for item in self.toParse:
-                    procDir = os.path.join(run,item[0])
-                    logfile = item[1]
-                    mtzfile = item[2]
+                    for item in self.toParse:
+                        procDir = os.path.join(code,item[0])
+                        logfile = item[1]
+                        mtzfile = item[2]
+                        self.Logfile.insert('%s: search template: procDir - logfile - mtzfile' %xtal)
+                        self.Logfile.insert('%s: procDir = %s' %(xtal,procDir))
+                        self.Logfile.insert('%s: logfile = %s' %(xtal,logfile))
+                        self.Logfile.insert('%s: mtzfile = %s' %(xtal,mtzfile))
 
-                    for folder in glob.glob(procDir):
-                        if self.junk(folder):
-                            continue
-                        if self.empty_folder(xtal,folder):
-                            continue
-                        if 'staraniso' in logfile or 'summary.tar.gz' in logfile:
-                            autoproc = 'aP_staraniso'
-                        else:
-                            autoproc = self.getAutoProc(folder)
-                        if self.alreadyParsed(xtal,current_run,autoproc):
-                            continue
-                        self.readProcessingUpdateResults(xtal,folder,logfile,mtzfile,timestamp,current_run,autoproc)
-                runList.append(current_run)
+                        for folder in glob.glob(procDir):
+                            staraniso = ''
+                            self.Logfile.insert('%s: searching %s' %(xtal,folder))
+                            if self.junk(folder):
+                                continue
+                            if self.empty_folder(xtal,folder):
+                                continue
+                            if 'staraniso' in logfile or 'summary.tar.gz' in logfile:
+                                staraniso = '_staraniso'
+                            autoproc = self.getAutoProc(folder,staraniso)
+                            if self.alreadyParsed(xtal,current_run+proc_code,autoproc):
+                                continue
+                            self.readProcessingUpdateResults(xtal,folder,logfile,mtzfile,timestamp,current_run,autoproc,proc_code)
+                    runList.append(current_run+proc_code)
 
             progress += progress_step
             self.emit(QtCore.SIGNAL('update_status_bar(QString)'), 'parsing auto-processing results for '+xtal)
@@ -2708,7 +2812,7 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
 
         runList = []
 
-        autoDir = ['auto','agamemnon']
+        autoDir = ['auto','agamemnon','recollect']
 
         for auto in autoDir:
             for collected_xtals in sorted(glob.glob(os.path.join(self.processedDir+'-*','processed',auto,self.target,'*'))):
@@ -2722,13 +2826,18 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
                 if xtal.endswith('_'):
                     continue    # happened sometime during testing, but should not happen anymore
 
-                self.Logfile.insert('%s: checking auto-processing results' %xtal)
+                self.Logfile.insert('%s: checking auto-processing results in %s %s' %(xtal,self.visit,auto))
                 self.createSampleDir(xtal)
 
+                foundRun = False
+                self.Logfile.insert('%s: checking for runs in %s' %(xtal,os.path.join(collected_xtals,'*')))
                 for run in sorted(glob.glob(os.path.join(collected_xtals,'*'))):
-                    current_run=run[run.rfind('/')+1:]
+                    foundRun = True
+                    self.Logfile.insert('%s: current run %s' %(xtal,run))
+                    current_run=auto+'_'+run[run.rfind('/')+1:]
                     if current_run not in runList:
-                        runList.append(current_run)
+                        self.Logfile.insert('%s: found new run -> %s' %(xtal,current_run))
+                        runList.append(self.visit+'_'+auto+'_'+current_run)
                     else:
                         continue
                     self.Logfile.insert('%s -> run: %s -> current run: %s' %(xtal,run,current_run))
@@ -2736,26 +2845,32 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
 
                     # create directory for crystal aligment images in projectDir
                     self.makeJPGdir(xtal,current_run)
-                    self.copyJPGs(xtal, current_run, auto)
+                    self.copyJPGs(xtal, run[run.rfind('/')+1:], auto)
 
                     for item in self.toParse:
                         procDir = os.path.join(run,item[0])
                         logfile = item[1]
                         mtzfile = item[2]
 
-                        for folder in glob.glob(procDir):
-                            for mtz in glob.glob(os.path.join(procDir,mtzfile)):
-                                print mtz
+                        self.Logfile.insert('%s: search template: procDir - logfile - mtzfile' % xtal)
+                        self.Logfile.insert('%s: procDir = %s' % (xtal, procDir))
+                        self.Logfile.insert('%s: logfile = %s' % (xtal, logfile))
+                        self.Logfile.insert('%s: mtzfile = %s' % (xtal, mtzfile))
+
+#                        for folder in glob.glob(procDir):
+#                            for mtz in glob.glob(os.path.join(procDir,mtzfile)):
+#                                print mtz
 
                         for folder in glob.glob(procDir):
+                            staraniso = ''
+                            self.Logfile.insert('%s: searching %s' % (xtal, folder))
                             if self.junk(folder):
                                 continue
                             if self.empty_folder(xtal,folder):
                                 continue
                             if 'staraniso' in logfile or 'summary.tar.gz' in logfile:
-                                autoproc = 'aP_staraniso'
-                            else:
-                                autoproc = self.getAutoProc(folder)
+                                staraniso = '_staraniso'
+                            autoproc = self.getAutoProc(folder, staraniso)
                             if self.alreadyParsed(xtal,current_run,autoproc):
                                 continue
                             self.readProcessingUpdateResults(xtal,folder,logfile,mtzfile,timestamp,current_run,autoproc)
@@ -2766,6 +2881,9 @@ class read_write_autoprocessing_results_from_to_disc(QtCore.QThread):
                     progress += progress_step
                     self.emit(QtCore.SIGNAL('update_status_bar(QString)'), 'parsing auto-processing results for '+collected_xtals)
                     self.emit(QtCore.SIGNAL('update_progress_bar'), progress)
+
+                if not foundRun:
+                    self.Logfile.error('%s: could not find run' %xtal)
 
         self.Logfile.insert('====== finished parsing beamline directory ======')
         self.emit(QtCore.SIGNAL('read_pinIDs_from_gda_logs'))

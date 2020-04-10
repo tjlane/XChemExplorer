@@ -53,7 +53,11 @@ class export_to_html:
                 ligNumber = ligand.split('-')[2]
                 eventMap = self.find_matching_event_map_from_database(xtal, ligand)
                 if eventMap:
+                    self.Logfile.insert('%s: using the following event map -> %s' %(xtal,eventMap))
                     self.cut_and_copy_map(xtal, ligand+'.pdb', eventMap, xtal + '_' + ligand + '_event.ccp4','F','PHIF')
+                    eventMap = xtal + '_' + ligand + '_event.ccp4'
+                else:
+                    self.Logfile.error('%s: value of event map -> %s' %(xtal,eventMap))
                 x,y,z = self.pdb.get_centre_of_gravity_of_residue(ligand)
                 self.copy_spider_plot(xtal,ligand)
                 pdbID = self.db_dict['Deposition_PDB_ID']
@@ -66,6 +70,10 @@ class export_to_html:
                 resoHigh = self.db_dict['DataProcessingResolutionHigh']
                 spg = self.db_dict['RefinementSpaceGroup']
                 unitCell = self.db_dict['DataProcessingUnitCell']
+                t = ''
+                for ax in unitCell.split():
+                    t += str(round(float(ax),1)) + ' '
+                unitCell = t[:-1]
                 os.chdir(os.path.join(self.projectDir,xtal))
                 FWT = xtal + '-' + ligand + '_2fofc.ccp4'
                 self.cut_and_copy_map(xtal, ligand + '.pdb', '2fofc.map', FWT,'FWT','PHWT')
@@ -74,7 +82,9 @@ class export_to_html:
                 ligConfidence = self.db.get_ligand_confidence_for_ligand(xtal, ligChain, ligNumber, ligName)
                 if ligConfidence.startswith('0'):
                     self.Logfile.warning('%s: ligand confidence of %s-%s-%s is %s; ignoring...' %(xtal,ligChain,ligNumber,ligName,ligConfidence))
-                    continue
+                    self.Logfile.warning('%s: this seems unlikely because this structure is apparently ready for deposition' %xtal)
+                    self.Logfile.warning('%s: will set it to "not assigned" for now, but please update in soakDB' %xtal)
+                    ligConfidence = 'not assigned'
                 modelStatus = self.db_dict['RefinementOutcome']
                 if firstFile:
                     html += XChemMain.html_ngl(pdb,eventMap.replace(self.projectDir,''),FWT,DELFWT,ligand)
@@ -272,15 +282,15 @@ class export_to_html:
         ligNumber = ligID.split('-')[2]
         eventMAP = self.db.get_event_map_for_ligand(xtal, ligChain, ligNumber, ligName)
         self.Logfile.insert('%s: the database thinks the following event map belongs to %s: %s' %(xtal,ligID,eventMAP))
-        print 'event map', eventMAP
+#        print 'event map', eventMAP
         if eventMAP == '' or 'none' in str(eventMAP).lower():
             self.Logfile.warning('%s: the respective field in the DB is apparently emtpy' %xtal)
             self.Logfile.warning('%s: will try to determine ligand - event map relationship by checking CC...' %xtal)
-            eventMap = self.find_matching_event_map(xtal,ligID)
+            eventMAP = self.find_matching_event_map(xtal,ligID)
         elif not os.path.isfile(eventMAP):
             self.Logfile.warning('%s: event map file does not exist!' %xtal)
             self.Logfile.warning('%s: will try to determine ligand - event map relationship by checking CC...' %xtal)
-            eventMap = self.find_matching_event_map(xtal,ligID)
+            eventMAP = self.find_matching_event_map(xtal,ligID)
         else:
             self.Logfile.insert('%s: found matching event map!' %xtal)
         return eventMAP
@@ -311,8 +321,8 @@ class export_to_html:
         else:
             self.Logfile.insert('%s: selected event map -> CC(%s) = %s for %s' %(xtal,ligID,highestCC,mtz[mtz.rfind('/')+1:]))
             eventMAP = mtz[mtz.rfind('/')+1:].replace('.P1.mtz','.ccp4')
-            if not os.path.isfile(eventMAP):
-                eventMAP = []
+#            if not os.path.isfile(eventMAP):
+#                eventMAP = []
 #            else:
 #                self.cut_eventMAP(xtal,ligID,eventMAP)
         return eventMAP
