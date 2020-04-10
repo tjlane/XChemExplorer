@@ -5018,23 +5018,39 @@ class XChemExplorer(QtGui.QApplication):
         self.refinement_table.resizeRowsToContents()
 
     def get_columns_to_show(self, column_list):
+        """
+        TJL says:
+        this function appears to map a list of "DB COL 2" names to integer positions in
+        the xtal_db...
+        """
         # maybe I coded some garbage before, but I need to find out which column name in the
         # data source corresponds to the actually displayed column name in the table
         # reason being that the unique column ID for DB may not be nice to look at
-        columns_to_show = []
-        for column in column_list:
-            # first find out what the column name in the header is:
-            column_name = ''
-            for name in self.all_columns_in_data_source:
-                if column == name[1]:
-                    column_name = name[0]
-            for n, all_column in enumerate(self.header):
-                if column_name == all_column:
-                    columns_to_show.append(n)
-                    break
 
-        #TJL HACK TODO
-        #columns_to_show = range(len(column_list)) # all...
+        columns_to_show = []
+        for db_col_2_name in column_list:
+
+            # TJL :: First, map DB COL 2 --> DB COL 1
+            db_col_1_name = 'not_found'
+            for name in self.db.column_list:
+                if str(db_col_2_name) == str(name[1]):
+                    db_col_1_name = name[0]
+                    continue # match success (part 1)
+
+            # TJL :: Then, map DB COL 1 --> xtal_dict position (fun fun)
+            if db_col_1_name in self.header:
+                header_index = self.header.index(db_col_1_name)
+                columns_to_show.append( header_index )
+                continue # match success (part 2)
+            else:
+                if db_col_1_name == 'not_found':
+                    raise ValueError(db_col_2_name, 'not in XChemDB.py master list')
+                else:
+                    raise ValueError(db_col_1_name, 'not in XChemExplorer self.header')
+
+        # TJL :: the awesome thing is we could remove this function entirely if we just
+        # used dictionaries the way they are most obviously used... indeed, this code
+        # is garbage.
 
         return columns_to_show
 
