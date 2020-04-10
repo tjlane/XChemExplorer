@@ -24,16 +24,47 @@ exceptions:
                           safely ignore it
 """
 
-import sqlite3
-from mysql.connector import connect
-import os,sys,glob
+import os
+import sys
+import glob
+import itertools
 import csv
-from datetime import datetime
 import getpass
+import sqlite3
 import yaml
+from datetime import datetime
+from mysql.connector import connect
 
 sys.path.append(os.getenv('XChemExplorer_DIR')+'/lib')
 import XChemLog
+
+
+# TJL flag that limits the number of items loaded
+_DEBUG = True
+
+def check_singleton(res, query=None):
+    if len(res) > 1:
+        if query:
+            print('QUERY', query)
+        raise IOError('multiple results in SQL query, expecting only one'
+                      ' \n{}'.format(res))
+    if len(res) == 0:
+        if query:
+            print('QUERY', query)
+        raise IOError('no SQL result, expected at least one')
+    else:
+        return res[0]
+
+
+def query_to_dict(query, cnx):                                                                
+    cursor = cnx.cursor()
+    cursor.execute(query)
+    desc = cursor.description
+    column_names = [col[0] for col in desc]
+    data = [dict(itertools.izip(column_names, row))
+            for row in cursor.fetchall()]
+    cursor.close()
+    return data
 
 
 class data_source:
@@ -50,7 +81,6 @@ class data_source:
         self.login_params = yaml.safe_load( open(sql_parameters_file, 'r') )
         print('connecting to DESY SQL:', self.login_params)
         self.cnx = connect(**self.login_params)
-        #cnx.close()
 
         # ---------------------------------------------------------------------
         # TJL COMMENT
@@ -68,22 +98,22 @@ class data_source:
 
         self.remote_column_list=[
             # DB column name                        XCE column name                             SQLite type             display in overview tab
-            ['ID',                                   'ID',                                      'INTEGER PRIMARY KEY',  0],
+            #['ID',                                   'ID',                                      'INTEGER PRIMARY KEY',  0],
             #['LabVisit',                             'LabVisit',                                'TEXT',                 1],
-            #['source_plate_barcode',                 'LibraryPlate',                            'TEXT',                 0],
-            #['source_plate_well',                    'SourceWell',                              'TEXT',                 0],
+            #['',                 'LibraryPlate',                            'TEXT',                 0],
+            #['',                    'SourceWell',                              'TEXT',                 0],
             #['LibraryName',                          'LibraryName',                             'TEXT',                 1],
             ['smiles',                               'Smiles',                                  'TEXT',                 1],
             #['CompoundSMILESproduct',                'Smiles - Product',                        'TEXT',                 1],
-            #['CompoundCode',                         'Compound ID',                             'TEXT',                 1],
+            #['compund_name',                         'Compound ID',                             'TEXT',                 1],
             #['CompoundStereo',                       'Compound Stereo',                         'TEXT',                 1],
             #['CompoundStereoSMILES',                 'Stereo SMILES',                           'TEXT',                 1],
             #['CompoundStereoCIFprogram',             'Stereo CIF program',                      'TEXT',                 1],
             #['CompoundStereoCIFs',                   'Compound Stereo IDs',                     'TEXT',                 1],
             #['CompoundAutofitCC',                    'autofit CC',                              'TEXT',                 1],
             #['CompoundAutofitprogram',               'autofit program',                         'TEXT',                 1],
-            ['source_plate_barcode',                         'CrystalPlate',                            'TEXT',                 1],
-            ['source_plate_well',                          'CrystalWell',                             'TEXT',                 1],
+            ['source_plate_barcode',                  'CrystalPlate',                            'TEXT',                 1],
+            ['source_plate_well',                     'CrystalWell',                             'TEXT',                 1],
             #['EchoX',                                'EchoX',                                   'TEXT',                 0],
             #['EchoY',                                'EchoY',                                   'TEXT',                 0],
             #['DropVolume',                           'DropVolume',                              'TEXT',                 0],
@@ -116,24 +146,26 @@ class data_source:
 
             ['beamline',                             'Beamline',                                'TEXT',                 0],
             #['DataCollectionDate',                   'Data Collection\nDate',                   'TEXT',                 1],
-            #['DataCollectionOutcome',                'DataCollection\nOutcome',                 'TEXT',                 1],
+            ['diffraction',                          'DataCollection\nOutcome',                 'TEXT',                 1],
             #['DataCollectionRun',                    'Run',                                     'TEXT',                 0],
             #['DataCollectionComment',                'DataCollection\nComment',                 'TEXT',                 0],
             #['DataCollectionWavelength',             'Wavelength',                              'TEXT',                 0],
             #['DataCollectionPinBarcode',             'GDA\nBarcode',                            'TEXT',                 1],
 
-            ['DataCollectionCrystalImage1', 'img1', 'TEXT', 1],
-            ['DataCollectionCrystalImage2', 'img2', 'TEXT', 1],
-            ['DataCollectionCrystalImage3', 'img3', 'TEXT', 1],
-            ['DataCollectionCrystalImage4', 'img4', 'TEXT', 1],
+            #['DataCollectionCrystalImage1', 'img1', 'TEXT', 1],
+            #['DataCollectionCrystalImage2', 'img2', 'TEXT', 1],
+            #['DataCollectionCrystalImage3', 'img3', 'TEXT', 1],
+            #['DataCollectionCrystalImage4', 'img4', 'TEXT', 1],
 
-            ['DataProcessingPathToImageFiles',       'Path to diffraction\nimage files',        'TEXT',                 1],
+            #['DataProcessingPathToImageFiles',       'Path to diffraction\nimage files',        'TEXT',                 1],
         ] 
 
             # -------------------------------------------------------------------------------------------------------------
             # TJL : we need to put these in the local DB or ask those guys to make new fields 
         self.local_column_list = [
             # from XChemExplorer
+
+            ['CrystalName',                          'Sample ID',                               'TEXT',                 0],
 
             ['ProjectDirectory',                     'ProjectDirectory',                        'TEXT',                 0],
 
@@ -555,6 +587,16 @@ class data_source:
             if column[3]==0:
                 do_not_display.append(column[1])
         return do_not_display
+
+    def query_to_dict(self, query):
+        cursor = self.cnx.cursor()
+        cursor.execute(query)
+        desc = cursor.description
+        column_names = [col[0] for col in desc]
+        data = [dict(itertools.izip(column_names, row))
+                for row in cursor.fetchall()]
+        cursor.close()
+        return data
         
     def get_empty_db_dict(self):
         db_dict={}
@@ -569,10 +611,10 @@ class data_source:
         connect.row_factory = sqlite3.Row
         cursor = connect.cursor()
 
-        tableDict = {   #'mainTable':        self.column_list,
+        tableDict = {   'mainTable':        self.local_column_list,
                         'panddaTable':      self.pandda_table_columns,
                         'depositTable':     self.deposition_table_columns,
-                        #'collectionTable':  self.data_collection_columns,
+                        'collectionTable':  self.data_collection_columns,
                         'zenodoTable':      self.zenodo_table_columns,
                         'labelTable':       self.label_table_columns    }
 
@@ -595,14 +637,26 @@ class data_source:
 
 
     def create_empty_data_source_file(self):
-        # TJL : this is creating the data table, which we should not need....
-        raise RuntimeError('disabled by TJL, should not be needed')
+
+        print('Creating file %s with mainTable' % self.data_source_file)
+
+        if os.path.exists(self.data_source_file):
+            print('File already exists! Not overwriting. Please remove and try again')
+            return
+
+        connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
+        with connect:
+            cursor = connect.cursor()
+            cursor.execute("CREATE TABLE mainTable("+self.local_column_list[0][0]+' '+self.local_column_list[0][2]+")")
+            for i in range(1, len(self.local_column_list)):
+                cursor.execute("alter table mainTable add column '"+self.local_column_list[i][0]+"' '"+self.local_column_list[i][2]+"'")
+            connect.commit()
 
 
     def get_all_samples_in_data_source_as_list(self):
 
         # TJL we will need to implement this
-        raise NotImplementedError()
+        #raise NotImplementedError()
 
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
@@ -611,28 +665,35 @@ class data_source:
         samples = cursor.fetchall()
         for sample in samples:
             existing_samples_in_db.append(str(sample[0]))
+
+        # TODO :: we should check local/remote have same entries
+
         return existing_samples_in_db
 
     def execute_statement(self,cmd):
-        raise RuntimeError('disabled by TJL, seems unsafe... (cmd=%d)' % cmd)
-
-    def get_db_dict_for_sample(self,sampleID):
-
-        # TJL we will need to implement this
-        raise NotImplementedError()
-
-        db_dict={}
-        header=[]
-        data=[]
+        # TJL : I don't like this method, but keeping it for now...
         connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
         cursor = connect.cursor()
-        cursor.execute("select * from mainTable where CrystalName='{0!s}';".format(sampleID))
-        for column in cursor.description:
-            header.append(column[0])
-        data = cursor.fetchall()
-        for n,item in enumerate(data[0]):
-            db_dict[header[n]]=str(item)
-        return db_dict
+        cursor.execute(cmd)
+        output=cursor.fetchall()
+        connect.commit()
+        return output
+
+    def get_db_dict_for_sample(self,sampleID):
+        return load_sample(self, crystal_id) # TJL HACK FOR NOW (sorry)
+
+        #db_dict={}
+        #header=[]
+        #data=[]
+        #connect=sqlite3.connect(self.data_source_file)     # creates sqlite file if non existent
+        #cursor = connect.cursor()
+        #cursor.execute("select * from mainTable where CrystalName='{0!s}';".format(sampleID))
+        #for column in cursor.description:
+        #    header.append(column[0])
+        #data = cursor.fetchall()
+        #for n,item in enumerate(data[0]):
+        #    db_dict[header[n]]=str(item)
+        #return db_dict
 
     def get_deposit_dict_for_sample(self,sampleID):
         db_dict={}
@@ -800,7 +861,39 @@ class data_source:
             connect.commit()
 
     def update_insert_data_source(self,sampleID,data_dict):
-        raise RuntimeError('disabled by TJL')
+        data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
+        data_dict['LastUpdated_by']=getpass.getuser()
+        connect=sqlite3.connect(self.data_source_file)
+        cursor = connect.cursor()
+        cursor.execute('Select CrystalName FROM mainTable')
+        available_columns=[]
+        cursor.execute("SELECT * FROM mainTable")
+        for column in cursor.description:           # only update existing columns in data source
+            available_columns.append(column[0])
+        if self.check_if_sample_exists_in_data_source(sampleID):
+            for key in data_dict:
+                value=data_dict[key]
+                if key=='ID' or key=='CrystalName':
+                    continue
+                if key not in available_columns: # TJL cp from below
+                    continue
+                if not str(value).replace(' ','')=='':  # ignore empty fields
+                    update_string=str(key)+'='+"'"+str(value)+"'"
+                    cursor.execute("UPDATE mainTable SET "+update_string+" WHERE CrystalName="+"'"+sampleID+"';")
+        else:
+            column_string='CrystalName'+','
+            value_string="'"+sampleID+"'"+','
+            for key in data_dict:
+                value=data_dict[key]
+                if key=='ID':
+                    continue
+                if key not in available_columns:
+                    continue
+                if not str(value).replace(' ','')=='':  # ignore if nothing in csv field
+                    value_string+="'"+str(value)+"'"+','
+                    column_string+=key+','
+            cursor.execute("INSERT INTO mainTable ("+column_string[:-1]+") VALUES ("+value_string[:-1]+");")
+        connect.commit()
 
     def update_insert_panddaTable(self,sampleID,data_dict):
         data_dict['LastUpdated']=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -1018,19 +1111,88 @@ class data_source:
         csvWriter.writerows([header]+rows)
 
     def load_samples_from_data_source(self):
+        raise RuntimeError()
 
-        # TJL we will need to implement this
-        raise NotImplementedError()
+    def load_sample_from_remote(self, crystal_id):
+        """
+        Returns a dict for the crystal_id, mapping field in the SQL table to values
+        combines data in "Crystals", "Compound_Drops", "Compounds" tables
+        """
+        q0 = "SELECT * FROM Crystals WHERE crystal_id='{}';".format(crystal_id)
+        crystal = self.query_to_dict(q0)
+        crystal = check_singleton(crystal, q0)
 
-        header=[]
-        data=[]
+        q1 = "SELECT * FROM Compound_Drops WHERE compound_drop_id='{}';".format(crystal['compound_drop_id'])
+        compound_drops = self.query_to_dict(q1)
+        compound_drops = check_singleton(compound_drops, q1)
+
+        q2 = "SELECT * FROM Compounds WHERE compound_id='{}';".format(compound_drops['compound_id'])
+        compounds = self.query_to_dict(q2)
+        compounds = check_singleton(compounds, q2)
+
+        # combine results
+        crystal.update(compound_drops)
+        crystal.update(compounds)
+
+        # XCE/DESY compatability
+        crystal['CrystalName'] = crystal['crystal_id']
+
+        return crystal
+
+
+    def load_sample_from_local(self, crystal_id):
         connect=sqlite3.connect(self.data_source_file)
         cursor = connect.cursor()
-        cursor.execute("SELECT * FROM mainTable")
-        for column in cursor.description:
-            header.append(column[0])
-        data = cursor.fetchall()
-        return header,data
+        cursor.execute("SELECT * FROM mainTable WHERE CrystalName='{}';".format(crystal_id))
+        desc = cursor.description
+        column_names = [col[0] for col in desc]
+        data = [dict(itertools.izip(column_names, row))
+                for row in cursor.fetchall()]
+        if len(data) == 0:
+            data = {}
+        elif len(data) == 1:
+            data = data[0]
+        else:
+            raise ValueError()
+        cursor.close()
+        return data
+
+
+    def load_sample(self, crystal_id):
+        r = self.load_sample_from_remote(crystal_id)
+        l = self.load_sample_from_local(crystal_id)
+        r.update(l)
+        return r
+
+
+    def load_all_samples(self):
+        """
+        Returns a dict of dicts:
+
+        all_samples : crystal_id --> crystal_dict   [e.g. MPro_1_0 --> dict]
+            crystal_dict : attr --> value           [e.g. smiles --> whatever]
+        """
+
+        if _DEBUG:
+            q0 = "SELECT crystal_id FROM Crystals LIMIT 10"
+        else:
+            q0 = "SELECT crystal_id FROM Crystals"
+
+        # a list of all crystal_ids 
+        # (specifially, list of dicts with 'crystal_id' field)
+        crystals = self.query_to_dict(q0)
+
+        # load relevant data from all tables for each id
+        all_crystals = {}
+        for crystal in crystals:
+            crystal_id = crystal['crystal_id']
+            all_crystals[crystal_id] = self.load_sample(crystal_id)
+        
+        return all_crystals
+
+
+    def fetch_all_samples(self):
+        raise RuntimeError()
 
     def get_pandda_info_for_coot(self,xtalID,pandda_site):
         pandda_info_for_coot=[]

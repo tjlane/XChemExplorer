@@ -90,7 +90,7 @@ class XChemExplorer(QtGui.QApplication):
         LayoutObjects(self).main_layout(self)
         LayoutFuncs().add_widgets_layouts(self)
 
-        self.checkLabXChemDir()
+        #self.checkLabXChemDir()
 
     def checkLabXChemDir(self):
         dirCheck = QtGui.QMessageBox()
@@ -2381,25 +2381,41 @@ class XChemExplorer(QtGui.QApplication):
         self.update_log.insert('creating missing columns in data source')
         self.db.create_missing_columns()
         self.update_log.insert('load header and data from data source')
-        self.header, self.data = self.db.load_samples_from_data_source()
-        self.update_log.insert('get all samples in data source')
-        all_samples_in_db = self.db.execute_statement("select CrystalName from mainTable where CrystalName is not '';")
 
-        self.xtal_db_dict = {}
-        sampleID_column = 0
-        for n, entry in enumerate(self.header):
-            if entry == 'CrystalName':
-                sampleID_column = n
-                break
-        for line in self.data:
-            if str(line[sampleID_column]) != '':
-                db_dict = {}
-                for n, entry in enumerate(line):
-                    if n != sampleID_column:
-                        db_dict[str(self.header[n])] = str(entry)
-                self.xtal_db_dict[str(line[sampleID_column])] = db_dict
+        # --> load samples
+        self.xtal_db_dict = self.db.load_all_samples()
+        self.update_log.insert('get all samples in data source')
+
+        # TJL populate local ds
+        for xtal_id in self.xtal_db_dict.keys():
+            self.db.update_insert_data_source(xtal_id, self.xtal_db_dict[xtal_id]) # updates local db
+
+        self.xtal_db_dict = self.db.load_all_samples() # reload, now with local fields... (TODO clean this up)
 
         print('==> XCE: found ' + str(len(self.xtal_db_dict)) + ' samples')
+
+
+    @property
+    def data(self):
+        """
+        A list of tuples of the values in self.xtal_db_dict
+        """
+        # hack by TJL to simplify the code...
+        # needs to match order of self.header
+        
+        data = []
+        for d in sorted(self.xtal_db_dict.values()):
+            data.append( tuple(d[k] for k in self.header) )
+
+        return data
+
+    @property
+    def header(self):
+        """
+        A list of all the data fields in self.xtal_db_dict
+        """
+        # hack by TJL to simplify the code...
+        return list(list(self.xtal_db_dict.values())[0].keys()) 
 
     def datasource_menu_save_samples(self):
         print('hallo')
@@ -3961,15 +3977,18 @@ class XChemExplorer(QtGui.QApplication):
         dummy = ['...', '', '', '', 0, '0']
         reference_file.append([dummy, 999])
         suitable_reference = []
-        for reference in self.reference_file_list:
-            # first we need one in the same pointgroup
-            if reference[5] == db_dict['DataProcessingPointGroup']:
-                try:
-                    difference = math.fabs(
-                        1 - (float(db_dict['DataProcessingUnitCellVolume']) / float(reference[4]))) * 100
-                    reference_file.append([reference, difference])
-                except ValueError:
-                    continue
+
+        # TJL DISABLED FOR NOW...
+        #for reference in self.reference_file_list:
+        #    # first we need one in the same pointgroup
+        #    if reference[5] == db_dict['DataProcessingPointGroup']:
+        #        try:
+        #            difference = math.fabs(
+        #                1 - (float(db_dict['DataProcessingUnitCellVolume']) / float(reference[4]))) * 100
+        #            reference_file.append([reference, difference])
+        #        except ValueError:
+        #            continue
+
         return reference_file
 
     def create_maps_table(self):
@@ -3978,7 +3997,8 @@ class XChemExplorer(QtGui.QApplication):
         for xtal in sorted(self.xtal_db_dict):
             new_xtal = False
             db_dict = self.xtal_db_dict[xtal]
-            if str(db_dict['DataCollectionOutcome']).lower().startswith('success'):
+
+            if str(db_dict['diffraction']).lower().startswith('success'):
                 reference_file = self.find_suitable_reference_file(db_dict)
                 smallest_uc_difference = min(reference_file, key=lambda x: x[1])
                 row = self.maps_table.rowCount()
@@ -3992,6 +4012,12 @@ class XChemExplorer(QtGui.QApplication):
                             current_row = table_row
                             break
                 for column, header in enumerate(column_name):
+
+                    # tjl
+                    # column = row index in XChemDB [i think...]
+                    # header = (2nd column in XChemDB, 1st column in XChemDB)
+                    # ... why ...
+
                     if header[0] == 'Sample ID':
                         cell_text = QtGui.QTableWidgetItem()
                         cell_text.setText(str(xtal))
@@ -4419,7 +4445,7 @@ class XChemExplorer(QtGui.QApplication):
                     dataset_outcome_combobox.activated[str].connect(self.dataset_outcome_combobox_change_outcome)
                     self.dataset_outcome_combobox_dict[xtal] = dataset_outcome_combobox
                     table.setCellWidget(row, column, dataset_outcome_combobox)
-                index = self.dataset_outcome_combobox_dict[xtal].findText(str(db_dict['DataCollectionOutcome']), QtCore.Qt.MatchFixedString)
+                index = self.dataset_outcome_combobox_dict[xtal].findText(str(db_dict['diffraction']), QtCore.Qt.MatchFixedString)
                 self.dataset_outcome_combobox_dict[xtal].setCurrentIndex(index)
 
             elif header[0].startswith('img'):
@@ -4666,7 +4692,7 @@ class XChemExplorer(QtGui.QApplication):
                         if entry[7] == selected_processing_result:
                             db_dict_current = entry[6]
                             program = db_dict['DataProcessingProgram']
-                            visit = db_dict['DataCollectionVisit']
+                            visit = 'DESY COV-SARS-2' #db_dict['DataCollectionVisit']
                             run = db_dict['DataCollectionRun']
                             self.update_log.insert(
                                 'user changed data processing files for {0!s} to visit={1!s}, '
@@ -4775,7 +4801,7 @@ class XChemExplorer(QtGui.QApplication):
             samples_in_table.append(sampleID)
 
         columns_to_show = self.get_columns_to_show(self.overview_datasource_table_columns)
-        n_rows = self.get_rows_with_sample_id_not_null_from_datasource()
+        #n_rows = self.get_rows_with_sample_id_not_null_from_datasource() # NOT USED
         sample_id_column = self.get_columns_to_show(['Sample ID'])
 
         for row in self.data:
@@ -4826,7 +4852,8 @@ class XChemExplorer(QtGui.QApplication):
         for xtal in sorted(self.xtal_db_dict):
             new_xtal = False
             db_dict = self.xtal_db_dict[xtal]
-            if os.path.isfile(db_dict['DimplePathToPDB']):
+
+            if os.path.isfile( str(db_dict.get('DimplePathToPDB', '')) ):
                 row = self.pandda_analyse_data_table.rowCount()
                 if xtal not in self.pandda_analyse_input_table_dict:
                     self.pandda_analyse_data_table.insertRow(row)
@@ -5005,6 +5032,10 @@ class XChemExplorer(QtGui.QApplication):
                 if column_name == all_column:
                     columns_to_show.append(n)
                     break
+
+        #TJL HACK TODO
+        #columns_to_show = range(len(column_list)) # all...
+
         return columns_to_show
 
     def get_rows_with_sample_id_not_null_from_datasource(self):

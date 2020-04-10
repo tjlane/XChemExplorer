@@ -243,19 +243,19 @@ def get_datasource_summary(db_file):
     out_dict={}
 
     out_dict['nr_samples']=len(db.execute_statement("select CrystalName from mainTable where CrystalName is not NULL;"))
-    out_dict['nr_samples_failed_to_mount']=len(db.execute_statement("select HarvestStatus from mainTable where HarvestStatus is 'fail';"))
+    out_dict['nr_samples_failed_to_mount']= 0 # TJL FIAT :)
 
-    out_dict['nr_smiles_for_samples']=len(db.execute_statement("select compoundSMILES from mainTable where compoundSMILES is not (NULL or '')"))
+    out_dict['nr_smiles_for_samples']=0
 
-    out_dict['nr_data_collection_success']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'success';"))
-    out_dict['nr_data_collection_centring_fail']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - centring failed';"))
-    out_dict['nr_data_collection_no-diffraction']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - no diffraction';"))
-    out_dict['nr_data_collection_processing_fail']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - processing';"))
-    out_dict['nr_data_collection_loop-empty']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - loop empty';"))
-    out_dict['nr_data_collection_loop-broken']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - loop broken';"))
-    out_dict['nr_data_collection_low-resolution']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - low resolution';"))
-    out_dict['nr_data_collection_no-X-rays']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - no X-rays';"))
-    out_dict['nr_data_collection_unknown']=len(db.execute_statement("select DataCollectionOutcome from mainTable where DataCollectionOutcome is 'Failed - unknown';"))
+    out_dict['nr_data_collection_success']=0
+    out_dict['nr_data_collection_centring_fail']=0
+    out_dict['nr_data_collection_no-diffraction']=0
+    out_dict['nr_data_collection_processing_fail']=0
+    out_dict['nr_data_collection_loop-empty']=0
+    out_dict['nr_data_collection_loop-broken']=0
+    out_dict['nr_data_collection_low-resolution']=0
+    out_dict['nr_data_collection_no-X-rays']=0
+    out_dict['nr_data_collection_unknown']=0
 
     out_dict['nr_data_collection_failed']=  out_dict['nr_data_collection_centring_fail'] + \
                                             out_dict['nr_data_collection_no-diffraction'] + \
